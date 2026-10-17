@@ -278,7 +278,10 @@ interface MusicDao {
     suspend fun getAllS3SongIds(): List<Long>
 
     /** Title/artist/duration of on-device songs, used to hide cloud copies of the same track. */
-    @Query("SELECT title, artist_name, duration FROM songs WHERE source_type = 0")
+    @Query("SELECT COUNT(*) FROM songs WHERE source_type = 0")
+    fun observeLocalSongCount(): Flow<Int>
+
+    @Query("SELECT title, artist_name, duration, file_path FROM songs WHERE source_type = 0")
     suspend fun getLocalSongMatchKeys(): List<SongMatchKey>
 
     @Transaction
@@ -1970,4 +1973,5 @@ data class SongMatchKey(
     @ColumnInfo(name = "title") val title: String,
     @ColumnInfo(name = "artist_name") val artistName: String,
     @ColumnInfo(name = "duration") val duration: Long,
+    @ColumnInfo(name = "file_path") val filePath: String = "",
 )
