@@ -40,6 +40,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -54,6 +55,8 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
+import androidx.compose.material3.pulltorefresh.PullToRefreshDefaults
+import androidx.compose.material3.pulltorefresh.rememberPullToRefreshState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -276,7 +279,7 @@ fun DownloadScreen(
     }
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalMaterial3ExpressiveApi::class)
 @Composable
 private fun FeedCatalog(
     sections: List<FeedSection>,
@@ -286,7 +289,21 @@ private fun FeedCatalog(
     modifier: Modifier = Modifier,
 ) {
     // Pull down to reload the extension home feed; the old sections stay visible meanwhile.
-    PullToRefreshBox(isRefreshing = loading, onRefresh = onRefresh, modifier = modifier) {
+    // Same expressive loading indicator as the library tabs.
+    val pullState = rememberPullToRefreshState()
+    PullToRefreshBox(
+        isRefreshing = loading,
+        onRefresh = onRefresh,
+        state = pullState,
+        modifier = modifier,
+        indicator = {
+            PullToRefreshDefaults.LoadingIndicator(
+                state = pullState,
+                isRefreshing = loading,
+                modifier = Modifier.align(Alignment.TopCenter),
+            )
+        },
+    ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(vertical = 8.dp),
