@@ -2,8 +2,10 @@ package com.theveloper.pixelplay.presentation.download
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -16,14 +18,20 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.rounded.CheckCircle
+import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Download
+import androidx.compose.material.icons.rounded.ErrorOutline
 import androidx.compose.material.icons.rounded.Extension
+import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.AssistChip
@@ -54,8 +62,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -68,6 +78,8 @@ import com.theveloper.pixelplay.R
 import com.theveloper.pixelplay.presentation.components.MiniPlayerHeight
 import com.theveloper.pixelplay.data.download.DownloadJob
 import com.theveloper.pixelplay.data.download.ExtTrack
+import com.theveloper.pixelplay.data.download.FeedItem
+import com.theveloper.pixelplay.data.download.FeedSection
 import com.theveloper.pixelplay.data.download.InstalledExtension
 import com.theveloper.pixelplay.data.download.JobStatus
 import com.theveloper.pixelplay.ui.theme.GoogleSansRounded
@@ -177,38 +189,65 @@ fun DownloadScreen(
                 },
             )
 
-            // Results
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                contentPadding = PaddingValues(vertical = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp),
-            ) {
-                items(ui.results, key = { "${it.providerId}:${it.id}" }) { track ->
-                    DownloadResultRow(track = track, onEnqueue = { viewModel.requestDownload(track) })
+            // Results, or the extension catalog until the user searches.
+            if (ui.results.isEmpty() && !ui.searching) {
+                FeedCatalog(
+                    sections = ui.feed,
+                    loading = ui.feedLoading,
+                    onItemClick = viewModel::openFeedItem,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                )
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentPadding = PaddingValues(vertical = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp),
+                ) {
+                    items(ui.results, key = { "${it.providerId}:${it.id}" }) { track ->
+                        DownloadResultRow(track = track, onEnqueue = { viewModel.requestDownload(track) })
+                    }
                 }
             }
 
-            HorizontalDivider()
-
-            // Queue
-            Text(
-                text = stringResource(R.string.download_queue),
-                style = MaterialTheme.typography.titleMedium,
-                fontFamily = GoogleSansRounded,
-                fontWeight = FontWeight.Bold,
-                modifier = Modifier.padding(vertical = 8.dp),
-            )
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 260.dp),
-                contentPadding = PaddingValues(bottom = 8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-            ) {
-                items(ui.jobs, key = { it.itemId }) { job ->
-                    DownloadJobRow(job = job, viewModel = viewModel)
+            // Queue: only takes space once something is queued.
+            if (ui.jobs.isNotEmpty()) {
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Row(
+                    modifier = Modifier.padding(top = 12.dp, bottom = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Text(
+                        text = stringResource(R.string.download_queue),
+                        style = MaterialTheme.typography.titleMedium,
+                        fontFamily = GoogleSansRounded,
+                        fontWeight = FontWeight.Bold,
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Text(
+                        text = ui.jobs.size.toString(),
+                        style = MaterialTheme.typography.labelMedium,
+                        fontFamily = GoogleSansRounded,
+                        color = MaterialTheme.colorScheme.onSecondaryContainer,
+                        modifier = Modifier
+                            .clip(CircleShape)
+                            .background(MaterialTheme.colorScheme.secondaryContainer)
+                            .padding(horizontal = 8.dp, vertical = 2.dp),
+                    )
+                }
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 280.dp),
+                    contentPadding = PaddingValues(bottom = 8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    items(ui.jobs, key = { it.itemId }) { job ->
+                        DownloadJobRow(job = job, viewModel = viewModel, modifier = Modifier.animateItem())
+                    }
                 }
             }
         }
@@ -225,8 +264,91 @@ fun DownloadScreen(
             DownloadOptionsSheet(
                 track = track,
                 providers = ui.downloadProviders,
+                installedCount = ui.installedAll.size,
+                lastProvider = ui.lastProvider,
+                lastQuality = ui.lastQuality,
                 onDownload = { providerId, quality -> viewModel.enqueue(track, quality, providerId) },
                 onDismiss = viewModel::dismissDownloadSheet,
+            )
+        }
+    }
+}
+
+@Composable
+private fun FeedCatalog(
+    sections: List<FeedSection>,
+    loading: Boolean,
+    onItemClick: (FeedItem) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    if (sections.isEmpty()) {
+        Box(modifier, contentAlignment = Alignment.Center) {
+            if (loading) CircularProgressIndicator()
+        }
+        return
+    }
+    LazyColumn(
+        modifier = modifier,
+        contentPadding = PaddingValues(vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(20.dp),
+    ) {
+        items(sections, key = { "${it.uri}:${it.title}" }) { section ->
+            Column {
+                Text(
+                    text = section.title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontFamily = GoogleSansRounded,
+                    fontWeight = FontWeight.Bold,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.padding(bottom = 10.dp),
+                )
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    items(section.items, key = { "${it.type}:${it.id}:${it.uri}" }) { item ->
+                        FeedItemCard(item = item, onClick = { onItemClick(item) })
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FeedItemCard(item: FeedItem, onClick: () -> Unit) {
+    val isArtist = item.type.equals("artist", ignoreCase = true)
+    Column(
+        modifier = Modifier
+            .width(136.dp)
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick),
+    ) {
+        AsyncImage(
+            model = item.coverUrl,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .size(136.dp)
+                .clip(if (isArtist) CircleShape else RoundedCornerShape(16.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+        )
+        Text(
+            text = item.name,
+            style = MaterialTheme.typography.bodyMedium,
+            fontFamily = GoogleSansRounded,
+            fontWeight = FontWeight.SemiBold,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis,
+            modifier = Modifier.padding(top = 8.dp),
+        )
+        val subtitle = item.artists.ifBlank { item.description.orEmpty() }
+        if (subtitle.isNotBlank()) {
+            Text(
+                text = subtitle,
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = GoogleSansRounded,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
             )
         }
     }
@@ -285,46 +407,135 @@ private fun DownloadResultRow(track: ExtTrack, onEnqueue: () -> Unit) {
 }
 
 @Composable
-private fun DownloadJobRow(job: DownloadJob, viewModel: DownloadViewModel) {
+private fun DownloadJobRow(job: DownloadJob, viewModel: DownloadViewModel, modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    Column(modifier = Modifier.fillMaxWidth()) {
-        LinearProgressIndicator(
-            progress = { job.progress.coerceIn(0f, 1f) },
-            modifier = Modifier.fillMaxWidth(),
-        )
-        Spacer(Modifier.height(4.dp))
-        Row(verticalAlignment = Alignment.CenterVertically) {
+    val colors = MaterialTheme.colorScheme
+    val active = job.status == JobStatus.QUEUED || job.status == JobStatus.DOWNLOADING
+    val statusColor = when (job.status) {
+        JobStatus.FAILED -> colors.error
+        JobStatus.COMPLETED -> colors.primary
+        else -> colors.onSurfaceVariant
+    }
+    Card(
+        modifier = modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(containerColor = colors.surfaceContainerHigh),
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 12.dp, top = 12.dp, bottom = 12.dp, end = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Box(contentAlignment = Alignment.Center) {
+                AsyncImage(
+                    model = job.track.coverUrl,
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(colors.surfaceVariant),
+                )
+                val badge = when (job.status) {
+                    JobStatus.COMPLETED -> Icons.Rounded.CheckCircle to colors.primary
+                    JobStatus.FAILED -> Icons.Rounded.ErrorOutline to colors.error
+                    else -> null
+                }
+                badge?.let { (icon, tint) ->
+                    Box(
+                        modifier = Modifier
+                            .size(48.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(colors.scrim.copy(alpha = 0.45f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(24.dp))
+                    }
+                }
+            }
+            Spacer(Modifier.width(12.dp))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = job.title,
-                    style = MaterialTheme.typography.bodyMedium,
+                    style = MaterialTheme.typography.titleSmall,
                     fontFamily = GoogleSansRounded,
+                    fontWeight = FontWeight.SemiBold,
                     maxLines = 1,
                     overflow = TextOverflow.Ellipsis,
                 )
+                if (job.track.artists.isNotEmpty()) {
+                    Text(
+                        text = job.track.artists,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = GoogleSansRounded,
+                        color = colors.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+                if (active) {
+                    Spacer(Modifier.height(8.dp))
+                    val progressModifier = Modifier
+                        .fillMaxWidth()
+                        .height(6.dp)
+                    // Queued or still resolving (no bytes yet): indeterminate.
+                    if (job.status == JobStatus.QUEUED || job.bytesTotal <= 0) {
+                        LinearProgressIndicator(
+                            modifier = progressModifier,
+                            trackColor = colors.secondaryContainer,
+                            strokeCap = StrokeCap.Round,
+                            gapSize = 0.dp,
+                        )
+                    } else {
+                        LinearProgressIndicator(
+                            progress = { job.progress.coerceIn(0f, 1f) },
+                            modifier = progressModifier,
+                            trackColor = colors.secondaryContainer,
+                            strokeCap = StrokeCap.Round,
+                            gapSize = 0.dp,
+                            drawStopIndicator = {},
+                        )
+                    }
+                }
+                Spacer(Modifier.height(6.dp))
                 Text(
                     text = bytesLine(job, context),
-                    style = MaterialTheme.typography.bodySmall,
+                    style = MaterialTheme.typography.labelMedium,
                     fontFamily = GoogleSansRounded,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = statusColor,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
                 )
+                if (job.status == JobStatus.FAILED && !job.error.isNullOrBlank()) {
+                    Text(
+                        text = job.error,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = GoogleSansRounded,
+                        color = colors.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
             }
             when (job.status) {
                 JobStatus.QUEUED, JobStatus.DOWNLOADING ->
-                    TextButton(onClick = { viewModel.cancel(job.itemId) }) {
-                        Text(stringResource(R.string.download_cancel), fontFamily = GoogleSansRounded)
+                    IconButton(onClick = { viewModel.cancel(job.itemId) }) {
+                        Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.download_cancel))
                     }
                 JobStatus.FAILED -> {
-                    TextButton(onClick = { viewModel.retry(job.itemId) }) {
-                        Text(stringResource(R.string.download_retry), fontFamily = GoogleSansRounded)
+                    IconButton(onClick = { viewModel.retry(job.itemId) }) {
+                        Icon(
+                            Icons.Rounded.Refresh,
+                            contentDescription = stringResource(R.string.download_retry),
+                            tint = colors.primary,
+                        )
                     }
-                    TextButton(onClick = { viewModel.dismiss(job.itemId) }) {
-                        Text(stringResource(R.string.download_dismiss), fontFamily = GoogleSansRounded)
+                    IconButton(onClick = { viewModel.dismiss(job.itemId) }) {
+                        Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.download_dismiss))
                     }
                 }
                 JobStatus.COMPLETED, JobStatus.CANCELLED ->
-                    TextButton(onClick = { viewModel.dismiss(job.itemId) }) {
-                        Text(stringResource(R.string.download_dismiss), fontFamily = GoogleSansRounded)
+                    IconButton(onClick = { viewModel.dismiss(job.itemId) }) {
+                        Icon(Icons.Rounded.Close, contentDescription = stringResource(R.string.download_dismiss))
                     }
             }
         }
@@ -339,6 +550,7 @@ private fun bytesLine(job: DownloadJob, context: android.content.Context): Strin
         JobStatus.FAILED -> context.getString(R.string.download_status_failed)
         JobStatus.CANCELLED -> context.getString(R.string.download_status_cancelled)
     }
+    if (job.bytesReceived <= 0 && job.bytesTotal <= 0) return status
     val received = android.text.format.Formatter.formatShortFileSize(context, job.bytesReceived)
     return if (job.bytesTotal > 0) {
         "$status · $received / ${android.text.format.Formatter.formatShortFileSize(context, job.bytesTotal)}"
@@ -352,17 +564,32 @@ private fun bytesLine(job: DownloadJob, context: android.content.Context): Strin
 private fun DownloadOptionsSheet(
     track: ExtTrack,
     providers: List<InstalledExtension>,
+    installedCount: Int,
+    lastProvider: String?,
+    lastQuality: String?,
     onDownload: (providerId: String, quality: String) -> Unit,
     onDismiss: () -> Unit,
 ) {
-    var selectedProvider by remember(track) {
-        mutableStateOf(providers.firstOrNull()?.id.orEmpty())
+    // Search and download extensions may differ (e.g. found via a metadata-only extension).
+    // Preselect: the track's own extension if it can download, else the last one used,
+    // else the only one installed. Otherwise the user picks an extension first.
+    var selectedProvider by remember(track, providers) {
+        mutableStateOf(
+            (providers.firstOrNull { it.id.equals(track.providerId, ignoreCase = true) }
+                ?: providers.firstOrNull { it.id == lastProvider }
+                ?: providers.singleOrNull())?.id.orEmpty(),
+        )
     }
+    // Quality IDs belong to the chosen extension, so the list appears once one is picked.
     val qualityOptions = remember(selectedProvider, providers) {
-        providers.firstOrNull { it.id == selectedProvider }?.manifest?.qualityOptions.orEmpty()
+        providers.firstOrNull { it.id == selectedProvider }?.qualityOptions.orEmpty()
     }
-    var selectedQuality by remember(selectedProvider) {
-        mutableStateOf(qualityOptions.firstOrNull()?.id ?: "flac")
+    var selectedQuality by remember(selectedProvider, qualityOptions) {
+        mutableStateOf(
+            qualityOptions.firstOrNull { it.id == lastQuality }?.id
+                ?: qualityOptions.firstOrNull()?.id
+                ?: "LOSSLESS",
+        )
     }
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
@@ -391,7 +618,8 @@ private fun DownloadOptionsSheet(
             )
             if (providers.isEmpty()) {
                 Text(
-                    text = stringResource(R.string.download_options_no_provider),
+                    text = if (installedCount == 0) stringResource(R.string.download_options_no_provider)
+                    else stringResource(R.string.download_options_not_download_provider),
                     style = MaterialTheme.typography.bodySmall,
                     fontFamily = GoogleSansRounded,
                     color = MaterialTheme.colorScheme.error,
@@ -459,7 +687,7 @@ private fun DownloadOptionsSheet(
 
             Button(
                 onClick = { onDownload(selectedProvider, selectedQuality) },
-                enabled = providers.isNotEmpty(),
+                enabled = selectedProvider.isNotEmpty(),
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 16.dp, bottom = 32.dp),
@@ -504,8 +732,17 @@ private fun AuthCodeDialog(prompt: String, onSubmit: (String) -> Unit, onDismiss
             }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text(stringResource(R.string.download_auth_cancel), fontFamily = GoogleSansRounded)
+            val uriHandler = LocalUriHandler.current
+            Row {
+                TextButton(onClick = onDismiss) {
+                    Text(stringResource(R.string.download_auth_cancel), fontFamily = GoogleSansRounded)
+                }
+                // The browser redirects to spotiflac://session-grant, handled by ExtensionCallbackActivity.
+                if (prompt.startsWith("http", ignoreCase = true)) {
+                    TextButton(onClick = { runCatching { uriHandler.openUri(prompt) }; onDismiss() }) {
+                        Text(stringResource(R.string.download_auth_open), fontFamily = GoogleSansRounded)
+                    }
+                }
             }
         },
     )

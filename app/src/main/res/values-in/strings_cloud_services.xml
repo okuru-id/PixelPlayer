@@ -250,7 +250,7 @@
     <string name="download_status_cancelled">Dibatalkan</string>
     <string name="download_artists_album">%1$s — %2$s</string>
     <string name="download_auth_title">Verifikasi diperlukan</string>
-    <string name="download_auth_message">Buka %1$s di browser Anda, selesaikan verifikasi, lalu masukkan kode yang Anda terima.</string>
+    <string name="download_auth_message">Buka %1$s di browser dan selesaikan verifikasi. PixelPlay melanjutkan unduhan otomatis saat browser kembali; jika Anda menerima kode, masukkan di bawah.</string>
     <string name="download_auth_code_label">Kode verifikasi</string>
     <string name="download_auth_submit">Kirim</string>
     <string name="download_auth_cancel">Batal</string>
@@ -315,4 +315,8 @@
     <string name="download_options_quality">Kualitas audio</string>
     <string name="download_options_no_provider">Belum ada extension pengunduh terpasang. Instal dari tab Extensions.</string>
     <string name="download_options_download">Unduh</string>
+    <string name="download_options_not_download_provider">Extension terpasang bukan extension pengunduh. Pasang extension pengunduh (mis. Amazon Music) dari tab Extensions.</string>
+    <string name="download_auth_open">Buka browser</string>
+    <string name="download_auth_success">Verifikasi selesai — mengulang unduhan</string>
+    <string name="download_auth_failed">Verifikasi gagal — coba lagi</string>
 </resources>

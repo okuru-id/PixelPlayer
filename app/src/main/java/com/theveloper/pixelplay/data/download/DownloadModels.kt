@@ -3,6 +3,9 @@ package com.theveloper.pixelplay.data.download
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
 
 /**
  * Wire models for the gobackend JSON API. Field names MUST match the Go
@@ -11,16 +14,30 @@ import kotlinx.serialization.json.Json
  */
 @Serializable
 data class DownloadRequest(
+    /** Download extension id; Go locks the download to it (strict mode, use_fallback=false). */
     val service: String,
+    /** Extension the track was found with; Go uses it for metadata enrichment. */
+    val source: String = "",
     @SerialName("track_name") val trackName: String,
     @SerialName("artist_name") val artistName: String,
     @SerialName("album_name") val albumName: String,
     @SerialName("album_artist") val albumArtist: String = "",
     @SerialName("cover_url") val coverUrl: String = "",
-    @SerialName("output_path") val outputPath: String,
+    /** Go builds "<dir>/<filename_format><ext>" here; the extension picks the real extension. */
+    @SerialName("output_dir") val outputDir: String,
     @SerialName("output_ext") val outputExt: String = "",
-    @SerialName("filename_format") val filenameFormat: String = "{tracknumber} - {artist} - {title}",
+    @SerialName("filename_format") val filenameFormat: String = "{artist} - {title}",
     val quality: String,
+    @SerialName("deezer_id") val deezerId: String = "",
+    @SerialName("tidal_id") val tidalId: String = "",
+    @SerialName("qobuz_id") val qobuzId: String = "",
+    val genre: String = "",
+    val label: String = "",
+    val copyright: String = "",
+    val composer: String = "",
+    val explicit: Boolean = false,
+    @SerialName("album_type") val albumType: String = "",
+    val upc: String = "",
     @SerialName("embed_metadata") val embedMetadata: Boolean = true,
     @SerialName("item_id") val itemId: String,
     @SerialName("duration_ms") val durationMs: Int = 0,
@@ -49,10 +66,39 @@ data class DownloadResponse(
     @SerialName("retry_after_seconds") val retryAfterSeconds: Int = 0,
     @SerialName("already_exists") val alreadyExists: Boolean = false,
     @SerialName("actual_extension") val actualExtension: String? = null,
+    @SerialName("audio_codec") val audioCodec: String? = null,
+    @SerialName("actual_bit_depth") val actualBitDepth: Int = 0,
+    @SerialName("actual_sample_rate") val actualSampleRate: Int = 0,
     val service: String? = null,
     val title: String? = null,
     val artist: String? = null,
     val album: String? = null,
+    @SerialName("album_artist") val albumArtist: String? = null,
+    @SerialName("release_date") val releaseDate: String? = null,
+    @SerialName("track_number") val trackNumber: Int = 0,
+    @SerialName("disc_number") val discNumber: Int = 0,
+    @SerialName("total_tracks") val totalTracks: Int = 0,
+    @SerialName("total_discs") val totalDiscs: Int = 0,
+    val isrc: String? = null,
+    @SerialName("cover_url") val coverUrl: String? = null,
+    val genre: String? = null,
+    val label: String? = null,
+    val copyright: String? = null,
+    val composer: String? = null,
+    @SerialName("lyrics_lrc") val lyricsLrc: String? = null,
+    /** Legacy flat key; newer extensions use [decryption]. */
+    @SerialName("decryption_key") val decryptionKey: String? = null,
+    val decryption: DecryptionInfo? = null,
+)
+
+/** Go extension_provider_types.go DownloadDecryptionInfo: the host must decrypt file_path itself. */
+@Serializable
+data class DecryptionInfo(
+    val strategy: String = "",
+    val key: String = "",
+    val iv: String = "",
+    @SerialName("input_format") val inputFormat: String = "",
+    @SerialName("output_extension") val outputExtension: String = "",
 )
 
 @Serializable
@@ -96,38 +142,83 @@ data class ExtTrack(
     val genre: String? = null,
     @SerialName("album_type") val albumType: String? = null,
     val explicit: Boolean = false,
+    @SerialName("deezer_id") val deezerId: String? = null,
+    @SerialName("tidal_id") val tidalId: String? = null,
+    @SerialName("qobuz_id") val qobuzId: String? = null,
+    val upc: String? = null,
+    val label: String? = null,
+    val copyright: String? = null,
+    val composer: String? = null,
 )
 
 @Serializable
 data class QualityOption(
     val id: String,
+    val kind: String = "",
     val label: String = "",
     val description: String = "",
 )
 
-@Serializable
-data class ExtensionManifest(
-    val name: String = "",
-    @SerialName("display_name") val displayName: String = "",
-    val version: String = "",
-    val description: String? = null,
-    // Go manifest emits an array of types ("metadata_provider",
-    // "download_provider", "lyrics_provider") under the JSON key "type".
-    @SerialName("type") val types: List<String> = emptyList(),
-    @SerialName("qualityOptions") val qualityOptions: List<QualityOption> = emptyList(),
-)
-
+/** One entry of GetInstalledExtensions (Go extension_manager.go ExtensionInfo, a flat object). */
 @Serializable
 data class InstalledExtension(
     val id: String,
-    val manifest: ExtensionManifest = ExtensionManifest(),
+    val name: String = "",
+    @SerialName("display_name") val displayNameRaw: String = "",
+    val version: String = "",
+    val description: String? = null,
+    val types: List<String> = emptyList(),
     val enabled: Boolean = false,
     val status: String = "",
-    val error: String? = null,
+    @SerialName("error_message") val error: String? = null,
+    @SerialName("quality_options") val qualityOptions: List<QualityOption> = emptyList(),
+    @SerialName("has_metadata_provider") val hasMetadataProvider: Boolean = false,
+    @SerialName("has_download_provider") val hasDownloadProvider: Boolean = false,
+    val capabilities: JsonObject? = null,
 ) {
-    val displayName: String get() = manifest.displayName.ifEmpty { manifest.name.ifEmpty { id } }
-    val version: String get() = manifest.version
-    val isDownloadProvider: Boolean get() = manifest.types.contains("download_provider")
+    val displayName: String get() = displayNameRaw.ifEmpty { name.ifEmpty { id } }
+    val isDownloadProvider: Boolean get() = hasDownloadProvider || "download_provider" in types
+    val hasHomeFeed: Boolean
+        get() = (capabilities?.get("homeFeed") as? JsonPrimitive)?.booleanOrNull == true
+}
+
+/** Extension getHomeFeed result (same shape SpotiFLAC's explore_provider parses). */
+@Serializable
+data class HomeFeed(
+    val success: Boolean = false,
+    val error: String? = null,
+    val sections: List<FeedSection> = emptyList(),
+)
+
+@Serializable
+data class FeedSection(
+    val uri: String = "",
+    val title: String = "",
+    val items: List<FeedItem> = emptyList(),
+)
+
+@Serializable
+data class FeedItem(
+    val id: String = "",
+    val uri: String = "",
+    val type: String = "track",
+    val name: String = "",
+    val artists: String = "",
+    val description: String? = null,
+    @SerialName("cover_url") val coverUrl: String? = null,
+    @SerialName("provider_id") val providerId: String? = null,
+    @SerialName("album_name") val albumName: String? = null,
+    @SerialName("duration_ms") val durationMs: Double = 0.0,
+) {
+    fun toTrack(defaultProvider: String) = ExtTrack(
+        id = id,
+        name = name,
+        artists = artists,
+        albumName = albumName.orEmpty(),
+        durationMs = durationMs.toInt(),
+        coverUrl = coverUrl,
+        providerId = providerId?.takeIf { it.isNotBlank() } ?: defaultProvider,
+    )
 }
 
 /**
@@ -150,4 +241,5 @@ data class RepoExtension(
     @SerialName("min_app_version") val minAppVersion: String = "",
 )
 
-val DownloadJson: Json = Json { ignoreUnknownKeys = true; encodeDefaults = true }
+// isLenient: extension JSON sometimes sends numbers where we expect strings.
+val DownloadJson: Json = Json { ignoreUnknownKeys = true; encodeDefaults = true; isLenient = true; coerceInputValues = true }

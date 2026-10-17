@@ -285,7 +285,7 @@
     <string name="download_status_cancelled">Cancelled</string>
     <string name="download_artists_album">%1$s — %2$s</string>
     <string name="download_auth_title">Verification required</string>
-    <string name="download_auth_message">Open %1$s in your browser, complete the check, then enter the code you received.</string>
+    <string name="download_auth_message">Open %1$s in your browser and complete the check. PixelPlay continues the download automatically when the browser returns; if you received a code instead, enter it below.</string>
     <string name="download_auth_code_label">Verification code</string>
     <string name="download_auth_submit">Submit</string>
     <string name="download_auth_cancel">Cancel</string>
@@ -316,4 +316,8 @@
     <string name="download_options_quality">Audio quality</string>
     <string name="download_options_no_provider">No download extension installed. Install one from the Extensions tab.</string>
     <string name="download_options_download">Download</string>
+    <string name="download_options_not_download_provider">Installed extensions are not download providers. Install a download extension (e.g. Amazon Music) from the Extensions tab.</string>
+    <string name="download_auth_open">Open browser</string>
+    <string name="download_auth_success">Verification complete — retrying downloads</string>
+    <string name="download_auth_failed">Verification failed — try again</string>
 </resources>

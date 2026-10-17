@@ -27,12 +27,18 @@ interface DownloadBackendApi {
     fun remove(id: String)
     fun setEnabled(id: String, enabled: Boolean)
     fun search(query: String, limit: Int = 30): List<ExtTrack>
+    fun homeFeed(extensionId: String): HomeFeed
     fun download(request: DownloadRequest): BackendResult<DownloadResponse>
     fun progressDelta(sinceSeq: Long): ProgressDelta
     fun waitProgressDelta(sinceSeq: Long, timeoutMs: Long): ProgressDelta
     fun cancel(itemId: String)
     fun pendingAuth(extensionId: String): String
     fun submitAuthCode(extensionId: String, code: String)
+    /**
+     * Completes a browser verification callback (spotiflac://session-grant or an OAuth
+     * callback). Returns the owning extension id; throws when the extension rejects it.
+     */
+    fun completeCallback(sessionGrant: Boolean, state: String, code: String): String
 }
 
 @Singleton
@@ -71,7 +77,10 @@ class GobackendDownloadBackend @Inject constructor(
         initIfNeeded()
         if (!initialized) return emptyList()
         val raw = gobackend.Gobackend.getInstalledExtensions()
-        return DownloadJson.decodeFromString(raw.ifEmpty { "[]" })
+        val list = runCatching { DownloadJson.decodeFromString<List<InstalledExtension>>(raw.ifEmpty { "[]" }) }
+            .getOrElse { emptyList() }
+        Log.d(TAG, "listInstalled: ${list.size} extensions: ${list.map { "${it.id}(types=${it.types},download=${it.isDownloadProvider},enabled=${it.enabled},err=${it.error},qualities=${it.qualityOptions.map(QualityOption::id)})" }}")
+        return list
     }
 
     override fun installFromFile(path: String): BackendResult<InstalledExtension?> {
@@ -151,6 +160,16 @@ class GobackendDownloadBackend @Inject constructor(
         return runCatching { DownloadJson.decodeFromString<List<ExtTrack>>(raw) }.getOrDefault(emptyList())
     }
 
+    override fun homeFeed(extensionId: String): HomeFeed {
+        initIfNeeded()
+        return runCatching {
+            DownloadJson.decodeFromString<HomeFeed>(gobackend.Gobackend.getExtensionHomeFeedJSON(extensionId))
+        }.getOrElse {
+            Log.e(TAG, "homeFeed($extensionId) failed", it)
+            HomeFeed(error = it.message)
+        }.also { Log.d(TAG, "homeFeed($extensionId): ${it.sections.size} sections, error=${it.error}") }
+    }
+
     override fun download(request: DownloadRequest): BackendResult<DownloadResponse> {
         initIfNeeded()
         return runCatching {
@@ -183,7 +202,31 @@ class GobackendDownloadBackend @Inject constructor(
     override fun submitAuthCode(extensionId: String, code: String) {
         gobackend.Gobackend.setExtensionAuthCodeByID(extensionId, code)
     }
+
+    // Same sequence as SpotiFLAC MainActivity.handleExtensionOAuthIntent.
+    override fun completeCallback(sessionGrant: Boolean, state: String, code: String): String {
+        initIfNeeded()
+        val extId: String
+        val raw: String
+        if (sessionGrant) {
+            extId = gobackend.Gobackend.resolveExtensionCallbackState(state)
+            gobackend.Gobackend.setExtensionSessionGrantByID(extId, code)
+            raw = gobackend.Gobackend.invokeExtensionActionJSON(extId, "completeGrant")
+            val result = runCatching { DownloadJson.decodeFromString<ActionResult>(raw) }.getOrDefault(ActionResult())
+            if (!result.success) {
+                throw IllegalStateException(result.error ?: result.message ?: "completeGrant failed for $extId")
+            }
+        } else {
+            extId = gobackend.Gobackend.consumeExtensionCallbackState(state)
+            gobackend.Gobackend.setExtensionAuthCodeByID(extId, code)
+            gobackend.Gobackend.invokeExtensionActionJSON(extId, "completeSpotifyLogin")
+        }
+        return extId
+    }
 }
 
 @Serializable
 private data class InstallResult(val name: String = "", val success: Boolean = false, val error: String? = null)
+
+@Serializable
+private data class ActionResult(val success: Boolean = false, val error: String? = null, val message: String? = null)

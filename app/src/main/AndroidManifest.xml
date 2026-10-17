@@ -78,6 +78,23 @@
                 android:resource="@xml/shortcuts" />
         </activity>
 
+        <!-- Browser redirect after a download extension's verification (callback URL is set by the extension). -->
+        <activity
+            android:name=".presentation.download.ExtensionCallbackActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="spotiflac" android:host="session-grant" />
+                <data android:scheme="spotiflac" android:host="callback" />
+                <data android:scheme="spotiflac" android:host="spotify-callback" />
+            </intent-filter>
+        </activity>
+
         <activity
             android:name=".presentation.telegram.auth.TelegramLoginActivity"
             android:exported="false"

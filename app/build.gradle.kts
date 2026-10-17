@@ -299,6 +299,8 @@ dependencies {
     implementation(libs.androidx.media)
     implementation(libs.coil.compose)
     implementation(libs.taglib)
+    // Decrypts extension downloads (e.g. Amazon "ffmpeg.mov_key") before publishing.
+    implementation(libs.ffmpeg.kit.min)
     implementation(libs.jaudiotagger)
     implementation(libs.vorbisjava.core)
     implementation(libs.wavy.slider)

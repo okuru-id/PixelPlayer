@@ -11,6 +11,8 @@ import com.theveloper.pixelplay.data.download.DownloadRepository
 import com.theveloper.pixelplay.data.download.DownloadSettings
 import com.theveloper.pixelplay.data.download.DownloadWorker
 import com.theveloper.pixelplay.data.download.ExtTrack
+import com.theveloper.pixelplay.data.download.FeedItem
+import com.theveloper.pixelplay.data.download.FeedSection
 import com.theveloper.pixelplay.data.download.InstalledExtension
 import com.theveloper.pixelplay.data.download.JobStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -57,15 +59,31 @@ class DownloadViewModel @Inject constructor(
         val authRequestId: String? = null,
         val authPrompt: String? = null,
         val downloadProviders: List<InstalledExtension> = emptyList(),
+        /** Total installed extensions regardless of type (for sheet messaging). */
+        val installedAll: List<InstalledExtension> = emptyList(),
         /** Track awaiting the extension/quality picker sheet; null when hidden. */
         val sheetTrack: ExtTrack? = null,
+        /** Last provider/quality the user downloaded with; preselected in the sheet. */
+        val lastProvider: String? = null,
+        val lastQuality: String? = null,
+        /** Catalog shown before the user searches (extension getHomeFeed). */
+        val feed: List<FeedSection> = emptyList(),
+        val feedProvider: String? = null,
+        val feedLoading: Boolean = false,
     )
 
-    private val _ui = MutableStateFlow(UiState(safFolderSet = settings.safTreeUri != null))
+    private val _ui = MutableStateFlow(
+        UiState(
+            safFolderSet = settings.safTreeUri != null,
+            lastProvider = settings.defaultProvider,
+            lastQuality = settings.defaultQuality,
+        ),
+    )
     val ui: StateFlow<UiState> = _ui.asStateFlow()
 
     init {
         loadDownloadProviders()
+        loadFeed()
         viewModelScope.launch {
             repository.jobs.collect { jobs ->
                 _ui.update { it.copy(jobs = jobs, safFolderSet = settings.safTreeUri != null) }
@@ -77,18 +95,51 @@ class DownloadViewModel @Inject constructor(
         }
     }
 
-    fun onQueryChange(query: String) = _ui.update { it.copy(query = query) }
+    // Clearing the query brings the catalog back.
+    fun onQueryChange(query: String) =
+        _ui.update { it.copy(query = query, results = if (query.isBlank()) emptyList() else it.results, error = null) }
+
+    /** Loads the catalog from a homeFeed extension, preferring a search (non-download) one. */
+    fun loadFeed() {
+        if (_ui.value.feedLoading) return
+        _ui.update { it.copy(feedLoading = true) }
+        viewModelScope.launch(Dispatchers.IO) {
+            val candidates = runCatching { backend.listInstalled() }.getOrDefault(emptyList())
+                .filter { it.enabled && it.error == null && it.hasHomeFeed }
+                .sortedBy { it.isDownloadProvider }
+            for (ext in candidates) {
+                val sections = backend.homeFeed(ext.id).sections
+                    .map { section -> section.copy(items = section.items.filter { it.name.isNotBlank() }) }
+                    .filter { it.items.isNotEmpty() }
+                if (sections.isNotEmpty()) {
+                    _ui.update { it.copy(feed = sections, feedProvider = ext.id, feedLoading = false) }
+                    return@launch
+                }
+            }
+            _ui.update { it.copy(feedLoading = false) }
+        }
+    }
+
+    /** Tracks open the download sheet; albums/playlists/artists search their name. */
+    fun openFeedItem(item: FeedItem) {
+        if (item.type.equals("track", ignoreCase = true)) {
+            requestDownload(item.toTrack(_ui.value.feedProvider.orEmpty()))
+        } else {
+            search(listOf(item.name, item.artists).filter { it.isNotBlank() }.joinToString(" "))
+        }
+    }
 
     private fun loadDownloadProviders() {
         viewModelScope.launch(Dispatchers.IO) {
             val installed = runCatching { backend.listInstalled() }.getOrDefault(emptyList())
             val providers = installed.filter { it.isDownloadProvider && it.enabled && it.error == null }
-            _ui.update { it.copy(downloadProviders = providers) }
+            _ui.update { it.copy(downloadProviders = providers, installedAll = installed) }
         }
     }
 
-    /** Tap download: open the extension/quality picker sheet first. */
+    /** Tap download: refresh provider list, then open the picker sheet. */
     fun requestDownload(track: ExtTrack) {
+        loadDownloadProviders()
         _ui.update { it.copy(sheetTrack = track) }
     }
 
@@ -102,6 +153,7 @@ class DownloadViewModel @Inject constructor(
         }
         settings.defaultQuality = quality
         settings.defaultProvider = providerId
+        _ui.update { it.copy(lastProvider = providerId, lastQuality = quality) }
         repository.enqueue(track, quality, providerId)
         DownloadWorker.enqueue(context)
     }
@@ -137,8 +189,8 @@ class DownloadViewModel @Inject constructor(
             it.status == JobStatus.FAILED && it.errorType == "verification_required"
         } ?: return
         viewModelScope.launch(Dispatchers.IO) {
-            // Job has no downloadProvider field; the extension id lives on the track.
-            val extId = job.track.providerId
+            // Verification belongs to the download extension, not the one the track was found with.
+            val extId = job.downloadProvider.ifEmpty { job.track.providerId }
             val pending = if (extId.isNotEmpty()) {
                 decodePendingAuth(backend.pendingAuth(extId))
             } else {
@@ -168,9 +220,7 @@ class DownloadViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             runCatching { backend.submitAuthCode(id, code) }
             // Retry the failed downloads now that the extension is authenticated.
-            _ui.value.jobs
-                .filter { it.errorType == "verification_required" && it.track.providerId == id }
-                .forEach { repository.retry(it.itemId) }
+            repository.retryVerification(id)
             DownloadWorker.enqueue(context)
         }
     }

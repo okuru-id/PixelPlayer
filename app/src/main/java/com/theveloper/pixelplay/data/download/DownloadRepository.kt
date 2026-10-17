@@ -86,6 +86,16 @@ class DownloadRepository @Inject constructor() {
         _jobs.update { list -> list.map { if (it.itemId == itemId) it.copy(status = JobStatus.QUEUED, error = null, errorType = null, progress = 0f) else it } }
     }
 
+    /** Requeues downloads that failed waiting on [extensionId]'s verification. */
+    fun retryVerification(extensionId: String) {
+        _jobs.value
+            .filter {
+                it.status == JobStatus.FAILED && it.errorType == "verification_required" &&
+                    it.downloadProvider.equals(extensionId, ignoreCase = true)
+            }
+            .forEach { retry(it.itemId) }
+    }
+
     fun dismiss(itemId: String) {
         _jobs.update { list -> list.filterNot { it.itemId == itemId } }
     }

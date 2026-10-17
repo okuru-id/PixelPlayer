@@ -7,6 +7,7 @@ import android.content.Context
 import android.content.pm.ServiceInfo
 import android.media.MediaScannerConnection
 import android.net.Uri
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.documentfile.provider.DocumentFile
@@ -38,6 +39,7 @@ class DownloadWorker @AssistedInject constructor(
     private val backend: DownloadBackendApi,
     private val repository: DownloadRepository,
     private val settings: DownloadSettings,
+    private val finalizer: DownloadFinalizer,
 ) : CoroutineWorker(appContext, params) {
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
@@ -55,30 +57,53 @@ class DownloadWorker @AssistedInject constructor(
     }
 
     private suspend fun process(job: DownloadJob, treeUri: String) {
-        val workFile = File(File(applicationContext.cacheDir, "downloads").apply { mkdirs() }, "${job.itemId}.work")
+        // Per-item cache dir: Go writes "<dir>/<artist> - <title><ext>" here and the extension
+        // picks the real extension. SAF publishing copies from it. Never output_fd.
+        val workDir = File(applicationContext.cacheDir, "downloads/${job.itemId}").apply { deleteRecursively(); mkdirs() }
+        try {
+            process(job, treeUri, workDir)
+        } finally {
+            workDir.deleteRecursively()
+        }
+    }
+
+    private suspend fun process(job: DownloadJob, treeUri: String, workDir: File) {
+        val track = job.track
+        val provider = job.downloadProvider
+        // Mirrors SpotiFLAC's _buildDownloadRequestPayload: service/download_provider = the
+        // chosen download extension (Go locks to it), source = the extension the track came from.
         val request = DownloadRequest(
-            service = "spotify",
-            trackName = job.track.name,
-            artistName = job.track.artists,
-            albumName = job.track.albumName,
-            albumArtist = job.track.albumArtist,
-            coverUrl = job.track.coverUrl.orEmpty(),
-            // Local cache file only — SAF publishing copies from it. Never output_fd.
-            outputPath = workFile.absolutePath,
-            outputExt = if (job.quality == "flac") "flac" else "",
+            service = provider,
+            source = track.providerId,
+            trackName = track.name,
+            artistName = track.artists,
+            albumName = track.albumName,
+            albumArtist = track.albumArtist,
+            coverUrl = track.coverUrl.orEmpty(),
+            outputDir = workDir.absolutePath,
             quality = job.quality,
-            downloadProvider = job.downloadProvider,
+            downloadProvider = provider,
             embedMetadata = true,
             itemId = job.itemId,
-            durationMs = job.track.durationMs,
-            trackNumber = job.track.trackNumber,
-            discNumber = job.track.discNumber,
-            totalTracks = job.track.totalTracks,
-            totalDiscs = job.track.totalDiscs,
-            releaseDate = job.track.releaseDate.orEmpty(),
-            isrc = job.track.isrc.orEmpty(),
-            spotifyId = job.track.spotifyId.orEmpty(),
-            providerTrackId = job.track.providerTrackId.orEmpty(),
+            durationMs = track.durationMs,
+            trackNumber = track.trackNumber,
+            discNumber = track.discNumber,
+            totalTracks = track.totalTracks,
+            totalDiscs = track.totalDiscs,
+            releaseDate = track.releaseDate.orEmpty(),
+            isrc = track.isrc.orEmpty(),
+            spotifyId = track.spotifyId?.takeIf { it.isNotBlank() } ?: track.id,
+            providerTrackId = track.providerTrackId?.takeIf { it.isNotBlank() } ?: knownProviderTrackId(track, provider),
+            deezerId = track.deezerId.orEmpty(),
+            tidalId = track.tidalId.orEmpty(),
+            qobuzId = track.qobuzId.orEmpty(),
+            genre = track.genre.orEmpty(),
+            label = track.label.orEmpty(),
+            copyright = track.copyright.orEmpty(),
+            composer = track.composer.orEmpty(),
+            explicit = track.explicit,
+            albumType = track.albumType.orEmpty(),
+            upc = track.upc.orEmpty(),
         )
         var seq = 0L
         val result = coroutineScope {
@@ -94,28 +119,54 @@ class DownloadWorker @AssistedInject constructor(
             poller.cancel()
             r
         }
-        workFile.delete() // gobackend may leave the work file behind on failure
-
         when (result) {
             is BackendResult.Failed ->
                 repository.markFailed(job.itemId, result.response.error ?: "Download failed", result.response.errorType)
-            is BackendResult.Ok -> {
-                val path = result.value.filePath
-                if (path == null) {
-                    repository.markFailed(job.itemId, "Backend returned no file", "no_file")
-                } else {
-                    val src = File(path)
-                    val ext = (result.value.actualExtension ?: job.quality).trimStart('.')
-                    val target = publish(src, treeUri, job, ext)
-                    src.delete()
-                    if (target != null) {
-                        repository.markCompleted(job.itemId, target.toString(), ext)
-                        MediaScannerConnection.scanFile(applicationContext, arrayOf(target.toString()), arrayOf(mimeFor(ext)), null)
-                        repository.markPublished(job.itemId)
-                    }
+            is BackendResult.Ok -> finalizeAndPublish(job, treeUri, result.value)
+        }
+    }
+
+    private fun finalizeAndPublish(job: DownloadJob, treeUri: String, response: DownloadResponse) {
+        val path = response.filePath?.takeIf { it.isNotBlank() && !it.startsWith("content://") }
+        var file = path?.let(::File)?.takeIf { it.isFile && it.length() > 0 } ?: run {
+            repository.markFailed(job.itemId, "Backend returned no file", "no_file")
+            return
+        }
+        try {
+            val decryption = finalizer.decryptionFor(response)
+            if (decryption != null && !response.alreadyExists) {
+                notify("Decrypting ${job.track.artists} - ${job.track.name}…")
+                file = try {
+                    finalizer.decrypt(file, decryption)
+                } catch (e: Exception) {
+                    Log.e(TAG, "Decrypt failed for ${job.itemId}", e)
+                    repository.markFailed(job.itemId, e.message ?: "Failed to decrypt encrypted stream", "decrypt_failed")
+                    return
                 }
             }
+            finalizer.writeTags(file, job.track, response)
+
+            val ext = file.extension.lowercase().ifEmpty {
+                response.actualExtension?.trimStart('.')?.lowercase().orEmpty().ifEmpty { "flac" }
+            }
+            val target = publish(file, treeUri, job, ext) ?: return
+            repository.markCompleted(job.itemId, target.toString(), ext)
+            MediaScannerConnection.scanFile(applicationContext, arrayOf(target.toString()), arrayOf(mimeFor(ext)), null)
+            repository.markPublished(job.itemId)
+        } finally {
+            file.delete() // Go may write outside workDir (extension data dir)
         }
+    }
+
+    /** SpotiFLAC _knownProviderTrackId: the track's own id only counts for the provider it came from. */
+    private fun knownProviderTrackId(track: ExtTrack, provider: String): String {
+        val id = track.id.trim()
+        if (id.isEmpty()) return ""
+        val sep = id.indexOf(':')
+        if (track.providerId.isNotBlank() && track.providerId.equals(provider, ignoreCase = true)) {
+            return if (sep >= 0 && sep + 1 < id.length) id.substring(sep + 1) else id
+        }
+        return if (sep > 0 && id.substring(0, sep).equals(provider, ignoreCase = true)) id.substring(sep + 1) else ""
     }
 
     /** Copies [src] into the SAF tree as "<artists> - <title>.<ext>" (collision-safe). Returns target uri or null after marking failed. */
@@ -153,14 +204,18 @@ class DownloadWorker @AssistedInject constructor(
     private fun mimeFor(ext: String) = when (ext) {
         "flac" -> "audio/flac"
         "mp3" -> "audio/mpeg"
-        "m4a" -> "audio/mp4"
+        "m4a", "mp4" -> "audio/mp4"
         "ogg", "opus" -> "audio/ogg"
+        "wav" -> "audio/wav"
         else -> "audio/*"
     }
 
     private fun updateNotification(job: DownloadJob, delta: ProgressDelta) {
         val p = delta.items[job.itemId] ?: return
-        val text = "Downloading ${job.track.artists} - ${job.track.name} · ${p.status} ${(p.progress * 100).toInt()}%"
+        notify("Downloading ${job.track.artists} - ${job.track.name} · ${p.status} ${(p.progress * 100).toInt()}%")
+    }
+
+    private fun notify(text: String) {
         NotificationManagerCompat.from(applicationContext).notify(NOTIF_ID, buildNotification(text))
     }
 
@@ -182,6 +237,7 @@ class DownloadWorker @AssistedInject constructor(
             .build()
 
     companion object {
+        private const val TAG = "DownloadWorker"
         const val CHANNEL_ID = "download_channel"
         const val NOTIF_ID = 4001
         const val UNIQUE_WORK = "external_download"
