@@ -7,8 +7,9 @@ Status: Approved (design), pending implementation plan
 
 Add in-app music downloads from external streaming providers, mirroring
 SpotiFLAC-Mobile's extension system. Users search a track, pick a quality,
-and the file (FLAC/MP3 with embedded metadata + cover art) is saved into a
-user-chosen SAF folder and shows up in PixelPlayer's local library.
+and the file (FLAC with embedded metadata + cover art; other formats keep
+provider tags) is saved into a user-chosen SAF folder and shows up in
+PixelPlayer's local library.
 
 Reference project: `/home/kurob/code/music/SpotiFLAC-Mobile` (MIT).
 Reuse its Go backend (`go_backend/`, 183 files) as a prebuilt AAR instead of
@@ -56,7 +57,7 @@ All calls are JSON-string based (gomobile bindings):
 | `GetInstalledExtensions()` | list for Extensions screen |
 | `RemoveExtensionByID(id)` / `SetExtensionEnabledByID(id, enabled)` | management |
 | `SearchTracksWithMetadataProvidersJSON(query, limit, includeExtensions)` | cross-provider search |
-| `DownloadByStrategy(requestJSON)` | download, writes to caller-provided `OutputFD`; tagging is done by this call: request includes `"embed_metadata": true` plus title/artist/album/cover fields, pipeline embeds them (`extension_fallback_output.go`) |
+| `DownloadByStrategy(requestJSON)` | download; request must set `use_extensions: true` (else hard error: built-in providers are retired), `item_id` (keys progress + cancel), `service` (provider id), `quality`; optional `output_ext`, `filename_format`; and `"embed_metadata": true` plus title/artist/album/cover fields — the pipeline embeds tags+cover into the staged FLAC file (`extension_fallback_output.go`). Pass a local `output_path` (cacheDir work file), NOT an `output_fd`: the extension pipeline stages and embeds in its own work file and returns the path in the response (`resp.file_path`) |
 | `GetAllDownloadProgressDelta(seq)` / `WaitForAllDownloadProgressDelta(seq, timeoutMs)` | progress polling |
 | `CancelDownload(itemID)` | cancel |
 | `GetExtensionPendingAuthJSON(extId)` / `SetExtensionAuthCodeByID(extId, code)` | extension auth flows |
@@ -65,7 +66,11 @@ Note: `RunPostProcessingV2JSON` exists but only runs extension-declared
 post-process hooks (returns `NewFilePath`); it does NOT write tags and is not
 needed for the basic flow. Metadata embedding happens inside the download
 pipeline via the `embed_metadata` request field (same as the SpotiFLAC app,
-see its `lib/services/download_request_payload.dart`).
+see its `lib/services/download_request_payload.dart`). Embedding is
+FLAC-only (go-flac/vorbis); MP3 downloads keep provider tags, with optional
+post-download retagging via `EditFileMetadata` if ever needed.
+Embedding also requires the output to be a real local absolute file —
+satisfied naturally by the `output_path` model.
 
 `.spotiflac-ext` = ZIP with a JSON manifest; gobackend handles validation,
 staging, version compare (refuses downgrade), and per-extension data dirs.
@@ -79,15 +84,17 @@ staging, version compare (refuses downgrade), and per-extension data dirs.
    → list of tracks with provider, quality options.
 3. User taps download, optionally picks quality (default FLAC):
    enqueue `DownloadWorker` (unique work, `ExistingWorkPolicy.APPEND`).
-4. Worker: create staging file in `cacheDir/downloads/<itemID>.part`, open
-   `ParcelFileDescriptor`, call `DownloadByStrategy` with `OutputFD`.
+4. Worker: create a work file under `cacheDir/downloads/` and pass its
+   absolute path as `output_path` (no `output_fd`). gobackend stages the
+   download and embeds metadata into that file.
 5. Poll progress deltas (~500 ms) → update notification and UI state
    (`DownloadRepository` exposes `StateFlow<List<DownloadJobState>>`).
 6. On success the output file already carries embedded tags: the download
    request set `"embed_metadata": true` with title/artist/album/cover
    fields. (No separate tagging step.)
 7. SAF publish: resolve user's chosen tree URI via `DocumentFile`, copy
-   staging → final name (`Artist - Title.flac`), delete staging. Name
+   `resp.file_path` (the finished, tagged file) → final name
+   (`Artist - Title.flac`), then delete the work file. Name
    collisions get ` (1)` suffixes (DocumentFile `createFile` semantics).
 8. Trigger local library scan so the new file appears under "Local".
 
@@ -97,8 +104,10 @@ staging, version compare (refuses downgrade), and per-extension data dirs.
   provider chip, quality), active queue section with progress bars and
   cancel buttons.
 - **ExtensionsScreen**: list installed extensions (name, version, enabled
-  toggle), install via system file picker (`.spotiflac-ext`) or repository
-  URL, remove, update. Includes third-party-code disclaimer.
+  toggle), install via system file picker (`.spotiflac-ext`), remove,
+  reinstall a newer version via file picker (no automatic update checking
+  in v1 — repository browsing is deferred). Includes third-party-code
+  disclaimer.
 - **Settings**: download folder (SAF picker, persisted tree URI), default
   quality.
 - Download notification: progress bar, cancel action; foreground service via
@@ -143,7 +152,7 @@ staging, version compare (refuses downgrade), and per-extension data dirs.
 - Command (needs `ANDROID_NDK_HOME`, `CGO_ENABLED=1`):
 
   ```bash
-  cd go_backend && go mod download
+  cd go_backend && go mod download   # go.mod requires Go >= 1.26.6
   go install golang.org/x/mobile/cmd/gomobile && gomobile init
   gomobile bind -target=android/arm64 -androidapi 24 -o ../app/libs/gobackend.aar .
   ```
