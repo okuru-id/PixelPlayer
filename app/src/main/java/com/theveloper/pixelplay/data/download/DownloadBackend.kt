@@ -164,5 +164,3 @@ class GobackendDownloadBackend @Inject constructor(
 
 @Serializable
 private data class InstallResult(val name: String = "", val success: Boolean = false, val error: String? = null)
-
-@Serializable
