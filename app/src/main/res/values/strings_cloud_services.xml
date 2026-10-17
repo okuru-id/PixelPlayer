@@ -262,4 +262,30 @@
     <string name="s3_cd_edit_connection">Edit connection</string>
     <string name="s3_probe_queue_running">Reading tags… %1$d songs remaining</string>
     <string name="s3_probe_queue_finishing">Finishing up…</string>
+
+    <!-- External download -->
+    <string name="download_title">Downloads</string>
+    <string name="download_search_hint">Search tracks…</string>
+    <string name="download_cd_search">Search</string>
+    <string name="download_cd_download">Download</string>
+    <string name="download_cd_extensions">Manage extensions</string>
+    <string name="download_no_results">No results. Install and enable an extension first.</string>
+    <string name="download_pick_folder_first">Pick a download folder first</string>
+    <string name="download_no_folder">Choose a download folder so finished tracks are saved to your library.</string>
+    <string name="download_pick_folder">Choose folder</string>
+    <string name="download_queue">Download queue</string>
+    <string name="download_cancel">Cancel</string>
+    <string name="download_retry">Retry</string>
+    <string name="download_dismiss">Dismiss</string>
+    <string name="download_status_queued">Queued</string>
+    <string name="download_status_downloading">Downloading</string>
+    <string name="download_status_completed">Completed</string>
+    <string name="download_status_failed">Failed</string>
+    <string name="download_status_cancelled">Cancelled</string>
+    <string name="download_artists_album">%1$s — %2$s</string>
+    <string name="download_auth_title">Verification required</string>
+    <string name="download_auth_message">Open %1$s in your browser, complete the check, then enter the code you received.</string>
+    <string name="download_auth_code_label">Verification code</string>
+    <string name="download_auth_submit">Submit</string>
+    <string name="download_auth_cancel">Cancel</string>
 </resources>

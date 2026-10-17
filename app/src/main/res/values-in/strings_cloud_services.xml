@@ -227,4 +227,30 @@
     <string name="auth_qq_title">QQ Music</string>
     <string name="s3_probe_queue_running">Membaca tag… %1$d lagu tersisa</string>
     <string name="s3_probe_queue_finishing">Menyelesaikan…</string>
+
+    <!-- External download -->
+    <string name="download_title">Unduhan</string>
+    <string name="download_search_hint">Cari lagu…</string>
+    <string name="download_cd_search">Cari</string>
+    <string name="download_cd_download">Unduh</string>
+    <string name="download_cd_extensions">Kelola ekstensi</string>
+    <string name="download_no_results">Tidak ada hasil. Instal dan aktifkan ekstensi terlebih dahulu.</string>
+    <string name="download_pick_folder_first">Pilih folder unduhan terlebih dahulu</string>
+    <string name="download_no_folder">Pilih folder unduhan agar lagu yang selesai tersimpan ke pustaka Anda.</string>
+    <string name="download_pick_folder">Pilih folder</string>
+    <string name="download_queue">Antrean unduhan</string>
+    <string name="download_cancel">Batal</string>
+    <string name="download_retry">Coba lagi</string>
+    <string name="download_dismiss">Tutup</string>
+    <string name="download_status_queued">Antre</string>
+    <string name="download_status_downloading">Mengunduh</string>
+    <string name="download_status_completed">Selesai</string>
+    <string name="download_status_failed">Gagal</string>
+    <string name="download_status_cancelled">Dibatalkan</string>
+    <string name="download_artists_album">%1$s — %2$s</string>
+    <string name="download_auth_title">Verifikasi diperlukan</string>
+    <string name="download_auth_message">Buka %1$s di browser Anda, selesaikan verifikasi, lalu masukkan kode yang Anda terima.</string>
+    <string name="download_auth_code_label">Kode verifikasi</string>
+    <string name="download_auth_submit">Kirim</string>
+    <string name="download_auth_cancel">Batal</string>
 </resources>
