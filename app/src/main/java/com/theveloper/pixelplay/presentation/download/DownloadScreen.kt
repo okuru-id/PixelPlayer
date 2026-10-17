@@ -121,6 +121,9 @@ fun DownloadScreen(
         }
     }
     LaunchedEffect(ui.jobs) { viewModel.checkPendingAuth() }
+    // Album/artist pages reuse the top bar back button instead of adding their own.
+    val detail = ui.details.lastOrNull()
+    BackHandler(enabled = detail != null) { viewModel.closeDetail() }
 
     Scaffold(
         topBar = {
@@ -133,7 +136,7 @@ fun DownloadScreen(
                     )
                 },
                 navigationIcon = {
-                    IconButton(onClick = onNavigateBack) {
+                    IconButton(onClick = { if (detail != null) viewModel.closeDetail() else onNavigateBack() }) {
                         Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.common_back))
                     }
                 },
@@ -182,12 +185,9 @@ fun DownloadScreen(
                 }
             }
 
-            val detail = ui.details.lastOrNull()
-            BackHandler(enabled = detail != null) { viewModel.closeDetail() }
             if (detail != null) {
                 DetailPane(
                     detail = detail,
-                    onBack = viewModel::closeDetail,
                     onDownload = viewModel::requestDownload,
                     onDownloadAll = { viewModel.requestDownloadAll(detail.tracks, detail.title) },
                     onOpenAlbum = { viewModel.openAlbum(it, detail.providerId) },
@@ -570,7 +570,6 @@ private fun CollectionRow(
 @Composable
 private fun DetailPane(
     detail: DownloadViewModel.Detail,
-    onBack: () -> Unit,
     onDownload: (ExtTrack) -> Unit,
     onDownloadAll: () -> Unit,
     onOpenAlbum: (CollectionInfo) -> Unit,
@@ -584,17 +583,6 @@ private fun DetailPane(
     ) {
         item(key = "header") {
             Column {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.common_back))
-                    }
-                    Text(
-                        text = stringResource(collectionTypeLabel(detail.type)),
-                        style = MaterialTheme.typography.labelLarge,
-                        fontFamily = GoogleSansRounded,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
                 Row(
                     modifier = Modifier.padding(vertical = 8.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -610,6 +598,12 @@ private fun DetailPane(
                     )
                     Spacer(Modifier.width(16.dp))
                     Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = stringResource(collectionTypeLabel(detail.type)),
+                            style = MaterialTheme.typography.labelLarge,
+                            fontFamily = GoogleSansRounded,
+                            color = MaterialTheme.colorScheme.primary,
+                        )
                         Text(
                             text = detail.title,
                             style = MaterialTheme.typography.titleLarge,
