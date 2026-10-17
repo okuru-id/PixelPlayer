@@ -275,4 +275,5 @@
     <string name="extensions_registry_placeholder">https://example.com/registry.json</string>
     <string name="extensions_registry_load">Muat</string>
     <string name="extensions_registry_edit">Ganti URL registry</string>
+    <string name="extensions_registry_clear">Hapus URL registry</string>
 </resources>

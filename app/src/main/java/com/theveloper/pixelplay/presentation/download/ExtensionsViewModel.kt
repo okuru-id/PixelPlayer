@@ -137,6 +137,11 @@ class ExtensionsViewModel @Inject constructor(
 
     fun editRegistry() = _ui.update { it.copy(registryEditing = true) }
 
+    fun clearRegistry() = viewModelScope.launch(Dispatchers.IO) {
+        backend.clearRegistryUrl()
+        _ui.update { it.copy(registryUrl = null, registryEditing = true, repoBrowse = emptyList(), repoError = null) }
+    }
+
     fun consumeRegistryEdit() = _ui.update { it.copy(registryEditing = false, registryError = null) }
 
     fun consumeError() = _ui.update { it.copy(error = null) }

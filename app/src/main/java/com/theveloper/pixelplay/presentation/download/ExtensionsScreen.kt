@@ -2,8 +2,11 @@ package com.theveloper.pixelplay.presentation.download
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -23,8 +26,9 @@ import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Card
+import androidx.compose.material3.PrimaryTabRow
+import androidx.compose.material3.Tab
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -56,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.theveloper.pixelplay.R
+import com.theveloper.pixelplay.presentation.screens.TabAnimation
 import com.theveloper.pixelplay.data.download.InstalledExtension
 import com.theveloper.pixelplay.data.download.RepoExtension
 import androidx.compose.ui.text.input.ImeAction
@@ -134,17 +139,43 @@ fun ExtensionsScreen(
                         .padding(vertical = 8.dp),
                 )
             }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                FilterChip(
-                    selected = selectedTab == 0,
+            PrimaryTabRow(
+                selectedTabIndex = selectedTab,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.surfaceContainerHighest)
+                    .padding(5.dp),
+                containerColor = Color.Transparent,
+                divider = {},
+                indicator = {},
+            ) {
+                TabAnimation(
+                    index = 0,
+                    title = stringResource(R.string.extensions_tab_installed),
+                    selectedIndex = selectedTab,
                     onClick = { selectedTab = 0 },
-                    label = { Text(stringResource(R.string.extensions_tab_installed), fontFamily = GoogleSansRounded) },
-                )
-                FilterChip(
-                    selected = selectedTab == 1,
+                ) {
+                    Text(
+                        text = stringResource(R.string.extensions_tab_installed),
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        fontFamily = GoogleSansRounded,
+                    )
+                }
+                TabAnimation(
+                    index = 1,
+                    title = stringResource(R.string.extensions_tab_repo),
+                    selectedIndex = selectedTab,
                     onClick = { selectedTab = 1 },
-                    label = { Text(stringResource(R.string.extensions_tab_repo), fontFamily = GoogleSansRounded) },
-                )
+                ) {
+                    Text(
+                        text = stringResource(R.string.extensions_tab_repo),
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        fontFamily = GoogleSansRounded,
+                    )
+                }
             }
             if (selectedTab == 1) {
                 val repoError = ui.repoError
@@ -197,6 +228,9 @@ fun ExtensionsScreen(
                                 )
                                 IconButton(onClick = viewModel::editRegistry) {
                                     Icon(Icons.Rounded.Edit, contentDescription = stringResource(R.string.extensions_registry_edit))
+                                }
+                                IconButton(onClick = viewModel::clearRegistry) {
+                                    Icon(Icons.Outlined.Delete, contentDescription = stringResource(R.string.extensions_registry_clear))
                                 }
                             }
                         }

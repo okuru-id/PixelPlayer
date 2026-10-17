@@ -21,6 +21,8 @@ interface DownloadBackendApi {
     fun installFromRepo(id: String): BackendResult<InstalledExtension?>
     /** Persists and applies a user-supplied registry URL. Returns null on success, error message on failure. */
     fun setRegistryUrl(url: String): String?
+    /** Removes the stored registry URL and clears the repo cache. */
+    fun clearRegistryUrl()
     fun remove(id: String)
     fun setEnabled(id: String, enabled: Boolean)
     fun search(query: String, limit: Int = 30): List<ExtTrack>
@@ -98,6 +100,12 @@ class GobackendDownloadBackend @Inject constructor(
             onSuccess = { settings.registryUrl = url.trim(); null },
             onFailure = { it.message ?: "Invalid registry URL" },
         )
+    }
+
+    override fun clearRegistryUrl() {
+        initIfNeeded()
+        runCatching { gobackend.Gobackend.clearRepoRegistryURLJSON() }
+        settings.registryUrl = null
     }
 
     override fun installFromRepo(id: String): BackendResult<InstalledExtension?> {

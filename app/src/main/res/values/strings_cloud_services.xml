@@ -310,4 +310,5 @@
     <string name="extensions_registry_placeholder">https://example.com/registry.json</string>
     <string name="extensions_registry_load">Load</string>
     <string name="extensions_registry_edit">Change registry URL</string>
+    <string name="extensions_registry_clear">Remove registry URL</string>
 </resources>
