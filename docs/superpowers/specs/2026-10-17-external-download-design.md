@@ -152,8 +152,8 @@ staging, version compare (refuses downgrade), and per-extension data dirs.
 ## AAR Provenance
 
 - Built from SpotiFLAC-Mobile at pinned commit:
-  `<FILL: record upstream SHA when the AAR is first built>`.
-- Built on: `<date>` · AAR committed at: `<our commit>`.
+  `a34e2935442e7ec661c539ab3c2df8fc0b23b1ff`.
+- Built on: `2026-10-17` · AAR committed at: `87d4a84005603623a9ef9479e15cc2b662b56d46`.
 - Command (needs `ANDROID_NDK_HOME`, `CGO_ENABLED=1`):
 
   ```bash

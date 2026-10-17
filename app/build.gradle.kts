@@ -237,6 +237,9 @@ kotlin {
 }
 
 dependencies {
+    // Embedded Go backend (SpotiFLAC-Mobile, MIT) — see scripts/build_gobackend_aar.sh
+    implementation(files("libs/gobackend.aar"))
+
     // Core & Optimization
     coreLibraryDesugaring(libs.desugar.jdk.libs)
     implementation(libs.androidx.profileinstaller)
