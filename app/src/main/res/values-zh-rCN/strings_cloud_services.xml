@@ -330,4 +330,14 @@
     <string name="download_error_open_file">无法打开目标文件</string>
     <string name="download_error_publish">无法保存文件</string>
     <string name="extensions_registry_compatible">兼容的扩展是以下网址列出的 SpotiFLAC 扩展：</string>
+    <string name="download_filter_songs">歌曲</string>
+    <string name="download_filter_albums">专辑</string>
+    <string name="download_filter_artists">艺术家</string>
+    <string name="download_filter_playlists">播放列表</string>
+    <string name="download_type_album">专辑</string>
+    <string name="download_type_artist">艺术家</string>
+    <string name="download_type_playlist">播放列表</string>
+    <string name="download_search_source">搜索来源</string>
+    <string name="download_top_tracks">热门歌曲</string>
+    <string name="download_all">全部下载（%1$d）</string>
 </resources>

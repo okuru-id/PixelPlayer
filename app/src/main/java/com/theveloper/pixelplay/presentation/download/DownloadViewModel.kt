@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import com.theveloper.pixelplay.R
+import com.theveloper.pixelplay.data.download.CollectionInfo
 import com.theveloper.pixelplay.data.download.DownloadBackendApi
 import com.theveloper.pixelplay.data.download.DownloadJob
 import com.theveloper.pixelplay.data.download.DownloadJson
@@ -15,6 +16,7 @@ import com.theveloper.pixelplay.data.download.FeedItem
 import com.theveloper.pixelplay.data.download.FeedSection
 import com.theveloper.pixelplay.data.download.InstalledExtension
 import com.theveloper.pixelplay.data.download.JobStatus
+import com.theveloper.pixelplay.data.download.collectionTypeOf
 import dagger.hilt.android.lifecycle.HiltViewModel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -61,8 +63,10 @@ class DownloadViewModel @Inject constructor(
         val downloadProviders: List<InstalledExtension> = emptyList(),
         /** Total installed extensions regardless of type (for sheet messaging). */
         val installedAll: List<InstalledExtension> = emptyList(),
-        /** Track awaiting the extension/quality picker sheet; null when hidden. */
-        val sheetTrack: ExtTrack? = null,
+        /** Tracks awaiting the extension/quality picker sheet; empty when hidden. */
+        val sheetTracks: List<ExtTrack> = emptyList(),
+        /** Sheet subtitle: the track name, or the album/playlist name for "download all". */
+        val sheetTitle: String = "",
         /** Last provider/quality the user downloaded with; preselected in the sheet. */
         val lastProvider: String? = null,
         val lastQuality: String? = null,
@@ -70,6 +74,27 @@ class DownloadViewModel @Inject constructor(
         val feed: List<FeedSection> = emptyList(),
         val feedProvider: String? = null,
         val feedLoading: Boolean = false,
+        /** Extensions with customSearch (manifest searchBehavior); picked one drives search. */
+        val searchProviders: List<InstalledExtension> = emptyList(),
+        val searchProvider: String? = null,
+        val searchFilter: String? = null,
+        /** Album/artist/playlist pages opened from results; last one is shown. */
+        val details: List<Detail> = emptyList(),
+    ) {
+        val searchExtension: InstalledExtension? get() = searchProviders.firstOrNull { it.id == searchProvider }
+    }
+
+    data class Detail(
+        val type: String,
+        val id: String,
+        val providerId: String,
+        val title: String,
+        val subtitle: String = "",
+        val coverUrl: String? = null,
+        val loading: Boolean = true,
+        val error: String? = null,
+        val tracks: List<ExtTrack> = emptyList(),
+        val albums: List<CollectionInfo> = emptyList(),
     )
 
     private val _ui = MutableStateFlow(
@@ -120,12 +145,48 @@ class DownloadViewModel @Inject constructor(
         }
     }
 
-    /** Tracks open the download sheet; albums/playlists/artists search their name. */
+    /** Tracks open the download sheet; albums/playlists/artists open their page. */
     fun openFeedItem(item: FeedItem) {
-        if (item.type.equals("track", ignoreCase = true)) {
-            requestDownload(item.toTrack(_ui.value.feedProvider.orEmpty()))
+        val provider = item.providerId?.takeIf { it.isNotBlank() } ?: _ui.value.feedProvider.orEmpty()
+        val type = collectionTypeOf(item.type)
+        if (type == null) {
+            requestDownload(item.toTrack(provider))
         } else {
-            search(listOf(item.name, item.artists).filter { it.isNotBlank() }.joinToString(" "))
+            openDetail(Detail(type, item.id, provider, item.name, item.artists, item.coverUrl))
+        }
+    }
+
+    /** Search result tap: collections open their page, tracks open the download sheet. */
+    fun openResult(track: ExtTrack) {
+        val type = track.collectionType ?: return requestDownload(track)
+        openDetail(Detail(type, track.id, track.providerId, track.name, track.artists, track.coverUrl))
+    }
+
+    fun openAlbum(album: CollectionInfo, providerId: String) =
+        openDetail(Detail("album", album.id, album.providerId?.takeIf { it.isNotBlank() } ?: providerId, album.name, album.artists, album.coverUrl))
+
+    fun closeDetail() = _ui.update { it.copy(details = it.details.dropLast(1)) }
+
+    private fun openDetail(detail: Detail) {
+        _ui.update { it.copy(details = it.details + detail) }
+        viewModelScope.launch(Dispatchers.IO) {
+            val loaded = runCatching { backend.providerMetadata(detail.providerId, detail.type, detail.id) }
+                .map { meta ->
+                    val info = meta.albumInfo ?: meta.playlistInfo ?: meta.artistInfo
+                    detail.copy(
+                        loading = false,
+                        title = info?.name?.takeIf { it.isNotBlank() } ?: detail.title,
+                        subtitle = info?.artists?.takeIf { it.isNotBlank() } ?: detail.subtitle,
+                        coverUrl = info?.coverUrl?.takeIf { it.isNotBlank() } ?: detail.coverUrl,
+                        // Artist pages: top tracks, then albums + singles/releases.
+                        tracks = (meta.trackList.ifEmpty { meta.topTracks })
+                            .map { if (it.providerId.isBlank()) it.copy(providerId = detail.providerId) else it },
+                        albums = (meta.albums + meta.releases).distinctBy { it.id },
+                    )
+                }
+                .getOrElse { detail.copy(loading = false, error = it.message ?: context.getString(R.string.download_no_results)) }
+            // Replace the matching page only if the user is still on it (or under it).
+            _ui.update { state -> state.copy(details = state.details.map { if (it === detail) loaded else it }) }
         }
     }
 
@@ -133,20 +194,56 @@ class DownloadViewModel @Inject constructor(
         viewModelScope.launch(Dispatchers.IO) {
             val installed = runCatching { backend.listInstalled() }.getOrDefault(emptyList())
             val providers = installed.filter { it.isDownloadProvider && it.enabled && it.error == null }
-            _ui.update { it.copy(downloadProviders = providers, installedAll = installed) }
+            val searchable = installed.filter { it.hasCustomSearch && it.enabled && it.error == null }
+            _ui.update { state ->
+                // Keep the saved/selected source while it is still installed; else the primary one.
+                val current = state.searchProvider ?: settings.searchProvider
+                val provider = searchable.firstOrNull { it.id == current }
+                    ?: searchable.firstOrNull { it.searchBehavior?.primary == true }
+                    ?: searchable.firstOrNull()
+                state.copy(
+                    downloadProviders = providers,
+                    installedAll = installed,
+                    searchProviders = searchable,
+                    searchProvider = provider?.id,
+                    searchFilter = state.searchFilter?.takeIf { f -> provider?.searchBehavior?.filters?.any { it.id == f } == true }
+                        ?: provider?.searchBehavior?.filters?.firstOrNull()?.id,
+                )
+            }
         }
     }
 
-    /** Tap download: refresh provider list, then open the picker sheet. */
-    fun requestDownload(track: ExtTrack) {
-        loadDownloadProviders()
-        _ui.update { it.copy(sheetTrack = track) }
+    fun selectSearchProvider(id: String) {
+        val ext = _ui.value.searchProviders.firstOrNull { it.id == id } ?: return
+        settings.searchProvider = id
+        _ui.update { it.copy(searchProvider = id, searchFilter = ext.searchBehavior?.filters?.firstOrNull()?.id) }
+        rerunSearch()
     }
 
-    fun dismissDownloadSheet() = _ui.update { it.copy(sheetTrack = null) }
+    fun selectSearchFilter(id: String) {
+        if (_ui.value.searchFilter == id) return
+        _ui.update { it.copy(searchFilter = id) }
+        rerunSearch()
+    }
 
-    fun enqueue(track: ExtTrack, quality: String, providerId: String) {
-        _ui.update { it.copy(sheetTrack = null) }
+    private fun rerunSearch() {
+        val query = _ui.value.query
+        if (query.isNotBlank()) search(query)
+    }
+
+    /** Tap download: refresh provider list, then open the picker sheet. */
+    fun requestDownload(track: ExtTrack) = requestDownloadAll(listOf(track), track.name)
+
+    fun requestDownloadAll(tracks: List<ExtTrack>, title: String) {
+        if (tracks.isEmpty()) return
+        loadDownloadProviders()
+        _ui.update { it.copy(sheetTracks = tracks, sheetTitle = title) }
+    }
+
+    fun dismissDownloadSheet() = _ui.update { it.copy(sheetTracks = emptyList()) }
+
+    fun enqueue(tracks: List<ExtTrack>, quality: String, providerId: String) {
+        _ui.update { it.copy(sheetTracks = emptyList()) }
         if (settings.safTreeUri == null) {
             _ui.update { it.copy(error = context.getString(R.string.download_pick_folder_first)) }
             return
@@ -154,18 +251,31 @@ class DownloadViewModel @Inject constructor(
         settings.defaultQuality = quality
         settings.defaultProvider = providerId
         _ui.update { it.copy(lastProvider = providerId, lastQuality = quality) }
-        repository.enqueue(track, quality, providerId)
+        tracks.forEach { repository.enqueue(it, quality, providerId) }
         DownloadWorker.enqueue(context)
     }
 
     fun search(query: String) = viewModelScope.launch(Dispatchers.IO) {
-        _ui.update { it.copy(query = query, searching = true) }
-        val tracks = runCatching { backend.search(query) }.getOrElse { emptyList() }
+        if (query.isBlank()) return@launch
+        val state = _ui.value
+        _ui.update { it.copy(query = query, searching = true, details = emptyList()) }
+        // Extension search honours the chosen filter (songs/albums/artists); otherwise the
+        // combined metadata search, which only returns tracks.
+        val provider = state.searchExtension
+        val result = runCatching {
+            if (provider != null) backend.customSearch(provider.id, query, state.searchFilter)
+            else backend.search(query)
+        }
+        val items = result.getOrDefault(emptyList())
         _ui.update {
             it.copy(
-                results = tracks,
+                results = items,
                 searching = false,
-                error = if (tracks.isEmpty()) context.getString(R.string.download_no_results) else null,
+                error = when {
+                    result.isFailure -> result.exceptionOrNull()?.message ?: context.getString(R.string.download_no_results)
+                    items.isEmpty() -> context.getString(R.string.download_no_results)
+                    else -> null
+                },
             )
         }
     }

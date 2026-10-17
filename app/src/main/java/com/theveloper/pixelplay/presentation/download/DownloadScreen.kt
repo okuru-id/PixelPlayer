@@ -1,5 +1,6 @@
 package com.theveloper.pixelplay.presentation.download
 
+import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -26,6 +27,8 @@ import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.ArrowDropDown
 import androidx.compose.material.icons.rounded.CheckCircle
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Download
@@ -39,8 +42,11 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -79,12 +85,15 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.theveloper.pixelplay.R
+import com.theveloper.pixelplay.data.download.CollectionInfo
 import com.theveloper.pixelplay.data.download.DownloadJob
 import com.theveloper.pixelplay.data.download.ExtTrack
 import com.theveloper.pixelplay.data.download.FeedItem
 import com.theveloper.pixelplay.data.download.FeedSection
 import com.theveloper.pixelplay.data.download.InstalledExtension
 import com.theveloper.pixelplay.data.download.JobStatus
+import com.theveloper.pixelplay.data.download.SearchFilterOption
+import com.theveloper.pixelplay.data.download.collectionTypeOf
 import com.theveloper.pixelplay.presentation.components.MiniPlayerHeight
 import com.theveloper.pixelplay.ui.theme.GoogleSansRounded
 
@@ -171,49 +180,87 @@ fun DownloadScreen(
                 }
             }
 
-            SmoothOutlinedField(
-                value = ui.query,
-                onValueChange = viewModel::onQueryChange,
-                modifier = Modifier.padding(vertical = 4.dp),
-                placeholder = stringResource(R.string.download_search_hint),
-                enabled = !ui.searching,
-                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
-                keyboardActions = KeyboardActions(onSearch = { viewModel.search(ui.query) }),
-                trailingIcon = {
-                    if (ui.searching) {
-                        CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
-                    } else {
-                        IconButton(onClick = { viewModel.search(ui.query) }) {
-                            Icon(
-                                Icons.Rounded.Search,
-                                contentDescription = stringResource(R.string.download_cd_search),
-                            )
-                        }
-                    }
-                },
-            )
-
-            // Results, or the extension catalog until the user searches.
-            if (ui.results.isEmpty() && !ui.searching) {
-                FeedCatalog(
-                    sections = ui.feed,
-                    loading = ui.feedLoading,
-                    onItemClick = viewModel::openFeedItem,
-                    onRefresh = viewModel::loadFeed,
+            val detail = ui.details.lastOrNull()
+            BackHandler(enabled = detail != null) { viewModel.closeDetail() }
+            if (detail != null) {
+                DetailPane(
+                    detail = detail,
+                    onBack = viewModel::closeDetail,
+                    onDownload = viewModel::requestDownload,
+                    onDownloadAll = { viewModel.requestDownloadAll(detail.tracks, detail.title) },
+                    onOpenAlbum = { viewModel.openAlbum(it, detail.providerId) },
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
                 )
             } else {
-                LazyColumn(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .weight(1f),
-                    contentPadding = PaddingValues(vertical = 4.dp),
-                    verticalArrangement = Arrangement.spacedBy(4.dp),
-                ) {
-                    items(ui.results, key = { "${it.providerId}:${it.id}" }) { track ->
-                        DownloadResultRow(track = track, onEnqueue = { viewModel.requestDownload(track) })
+                SmoothOutlinedField(
+                    value = ui.query,
+                    onValueChange = viewModel::onQueryChange,
+                    modifier = Modifier.padding(vertical = 4.dp),
+                    placeholder = ui.searchExtension?.searchBehavior?.placeholder?.takeIf { it.isNotBlank() }
+                        ?: stringResource(R.string.download_search_hint),
+                    enabled = !ui.searching,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                    keyboardActions = KeyboardActions(onSearch = { viewModel.search(ui.query) }),
+                    trailingIcon = {
+                        if (ui.searching) {
+                            CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
+                        } else {
+                            IconButton(onClick = { viewModel.search(ui.query) }) {
+                                Icon(
+                                    Icons.Rounded.Search,
+                                    contentDescription = stringResource(R.string.download_cd_search),
+                                )
+                            }
+                        }
+                    },
+                )
+
+                if (ui.searchProviders.isNotEmpty()) {
+                    SearchSourceBar(
+                        providers = ui.searchProviders,
+                        selected = ui.searchExtension,
+                        filter = ui.searchFilter,
+                        onProvider = viewModel::selectSearchProvider,
+                        onFilter = viewModel::selectSearchFilter,
+                    )
+                }
+
+                // Results, or the extension catalog until the user searches.
+                if (ui.results.isEmpty() && !ui.searching) {
+                    FeedCatalog(
+                        sections = ui.feed,
+                        loading = ui.feedLoading,
+                        onItemClick = viewModel::openFeedItem,
+                        onRefresh = viewModel::loadFeed,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                    )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentPadding = PaddingValues(vertical = 4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp),
+                    ) {
+                        items(ui.results, key = { "${it.providerId}:${it.itemType}:${it.id}" }) { track ->
+                            val type = track.collectionType
+                            if (type != null) {
+                                CollectionRow(
+                                    title = track.name,
+                                    subtitle = listOf(stringResource(collectionTypeLabel(type)), track.artists)
+                                        .filter { it.isNotBlank() }.joinToString(" · "),
+                                    coverUrl = track.coverUrl,
+                                    round = type == "artist",
+                                    onClick = { viewModel.openResult(track) },
+                                )
+                            } else {
+                                DownloadResultRow(track = track, onEnqueue = { viewModel.requestDownload(track) })
+                            }
+                        }
                     }
                 }
             }
@@ -265,14 +312,15 @@ fun DownloadScreen(
             )
         }
 
-        ui.sheetTrack?.let { track ->
+        ui.sheetTracks.firstOrNull()?.let { track ->
             DownloadOptionsSheet(
                 track = track,
+                title = ui.sheetTitle,
                 providers = ui.downloadProviders,
                 installedCount = ui.installedAll.size,
                 lastProvider = ui.lastProvider,
                 lastQuality = ui.lastQuality,
-                onDownload = { providerId, quality -> viewModel.enqueue(track, quality, providerId) },
+                onDownload = { providerId, quality -> viewModel.enqueue(ui.sheetTracks, quality, providerId) },
                 onDismiss = viewModel::dismissDownloadSheet,
             )
         }
@@ -372,6 +420,248 @@ private fun FeedItemCard(item: FeedItem, onClick: () -> Unit) {
             )
         }
     }
+}
+
+/** Extension source picker + its search filters (songs / albums / artists / playlists). */
+@Composable
+private fun SearchSourceBar(
+    providers: List<InstalledExtension>,
+    selected: InstalledExtension?,
+    filter: String?,
+    onProvider: (String) -> Unit,
+    onFilter: (String) -> Unit,
+) {
+    var menuOpen by remember { mutableStateOf(false) }
+    LazyRow(
+        modifier = Modifier.padding(bottom = 4.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        item {
+            Box {
+                AssistChip(
+                    onClick = { menuOpen = true },
+                    label = { Text(selected?.displayName.orEmpty(), fontFamily = GoogleSansRounded) },
+                    trailingIcon = { Icon(Icons.Rounded.ArrowDropDown, contentDescription = stringResource(R.string.download_search_source)) },
+                )
+                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                    providers.forEach { ext ->
+                        DropdownMenuItem(
+                            text = { Text(ext.displayName, fontFamily = GoogleSansRounded) },
+                            onClick = {
+                                menuOpen = false
+                                onProvider(ext.id)
+                            },
+                        )
+                    }
+                }
+            }
+        }
+        items(selected?.searchBehavior?.filters.orEmpty(), key = { it.id }) { option ->
+            FilterChip(
+                selected = option.id == filter,
+                onClick = { onFilter(option.id) },
+                label = { Text(filterLabel(option), fontFamily = GoogleSansRounded) },
+            )
+        }
+    }
+}
+
+@Composable
+private fun filterLabel(option: SearchFilterOption): String =
+    when (collectionTypeOf(option.id) ?: option.id.lowercase().removeSuffix("s")) {
+        "album" -> stringResource(R.string.download_filter_albums)
+        "artist" -> stringResource(R.string.download_filter_artists)
+        "playlist" -> stringResource(R.string.download_filter_playlists)
+        "track", "song" -> stringResource(R.string.download_filter_songs)
+        else -> option.label.ifEmpty { option.id }
+    }
+
+private fun collectionTypeLabel(type: String): Int = when (type) {
+    "artist" -> R.string.download_type_artist
+    "playlist" -> R.string.download_type_playlist
+    else -> R.string.download_type_album
+}
+
+@Composable
+private fun CollectionRow(
+    title: String,
+    subtitle: String,
+    coverUrl: String?,
+    round: Boolean,
+    onClick: () -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 4.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        AsyncImage(
+            model = coverUrl,
+            contentDescription = null,
+            contentScale = ContentScale.Crop,
+            modifier = Modifier
+                .size(56.dp)
+                .clip(if (round) CircleShape else RoundedCornerShape(12.dp))
+                .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+        )
+        Spacer(Modifier.width(12.dp))
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                fontFamily = GoogleSansRounded,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+            )
+            if (subtitle.isNotBlank()) {
+                Text(
+                    text = subtitle,
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = GoogleSansRounded,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
+        }
+        Icon(
+            Icons.AutoMirrored.Rounded.KeyboardArrowRight,
+            contentDescription = null,
+            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+/** Album / playlist / artist page opened from search or the catalog. */
+@Composable
+private fun DetailPane(
+    detail: DownloadViewModel.Detail,
+    onBack: () -> Unit,
+    onDownload: (ExtTrack) -> Unit,
+    onDownloadAll: () -> Unit,
+    onOpenAlbum: (CollectionInfo) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val isArtist = detail.type == "artist"
+    LazyColumn(
+        modifier = modifier,
+        contentPadding = PaddingValues(vertical = 4.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+    ) {
+        item(key = "header") {
+            Column {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onBack) {
+                        Icon(Icons.AutoMirrored.Rounded.ArrowBack, contentDescription = stringResource(R.string.common_back))
+                    }
+                    Text(
+                        text = stringResource(collectionTypeLabel(detail.type)),
+                        style = MaterialTheme.typography.labelLarge,
+                        fontFamily = GoogleSansRounded,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    )
+                }
+                Row(
+                    modifier = Modifier.padding(vertical = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    AsyncImage(
+                        model = detail.coverUrl,
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier
+                            .size(112.dp)
+                            .clip(if (isArtist) CircleShape else RoundedCornerShape(16.dp))
+                            .background(MaterialTheme.colorScheme.surfaceContainerHigh),
+                    )
+                    Spacer(Modifier.width(16.dp))
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = detail.title,
+                            style = MaterialTheme.typography.titleLarge,
+                            fontFamily = GoogleSansRounded,
+                            fontWeight = FontWeight.Bold,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis,
+                        )
+                        if (detail.subtitle.isNotBlank()) {
+                            Text(
+                                text = detail.subtitle,
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontFamily = GoogleSansRounded,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                            )
+                        }
+                        if (!isArtist && detail.tracks.isNotEmpty()) {
+                            Button(
+                                onClick = onDownloadAll,
+                                modifier = Modifier.padding(top = 8.dp),
+                                shape = RoundedCornerShape(20.dp),
+                            ) {
+                                Icon(Icons.Rounded.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    stringResource(R.string.download_all, detail.tracks.size),
+                                    fontFamily = GoogleSansRounded,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        when {
+            detail.loading -> item(key = "loading") {
+                Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator()
+                }
+            }
+            detail.error != null -> item(key = "error") {
+                Text(
+                    text = detail.error,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontFamily = GoogleSansRounded,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(vertical = 16.dp),
+                )
+            }
+        }
+        if (isArtist && detail.tracks.isNotEmpty()) {
+            item(key = "top-title") { SectionTitle(stringResource(R.string.download_top_tracks)) }
+        }
+        items(detail.tracks, key = { "t:${it.providerId}:${it.id}" }) { track ->
+            DownloadResultRow(track = track, onEnqueue = { onDownload(track) })
+        }
+        if (detail.albums.isNotEmpty()) {
+            item(key = "albums-title") { SectionTitle(stringResource(R.string.download_filter_albums)) }
+            items(detail.albums, key = { "a:${it.id}" }) { album ->
+                CollectionRow(
+                    title = album.name,
+                    subtitle = listOfNotNull(album.releaseDate?.take(4), album.albumType)
+                        .filter { it.isNotBlank() }.joinToString(" · "),
+                    coverUrl = album.coverUrl,
+                    round = false,
+                    onClick = { onOpenAlbum(album) },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun SectionTitle(text: String) {
+    Text(
+        text = text,
+        style = MaterialTheme.typography.titleMedium,
+        fontFamily = GoogleSansRounded,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(top = 12.dp, bottom = 4.dp),
+    )
 }
 
 @Composable
@@ -583,6 +873,7 @@ private fun bytesLine(job: DownloadJob, context: android.content.Context): Strin
 @Composable
 private fun DownloadOptionsSheet(
     track: ExtTrack,
+    title: String,
     providers: List<InstalledExtension>,
     installedCount: Int,
     lastProvider: String?,
@@ -621,7 +912,7 @@ private fun DownloadOptionsSheet(
                 fontWeight = FontWeight.Bold,
             )
             Text(
-                text = track.name,
+                text = title.ifEmpty { track.name },
                 style = MaterialTheme.typography.bodySmall,
                 fontFamily = GoogleSansRounded,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,

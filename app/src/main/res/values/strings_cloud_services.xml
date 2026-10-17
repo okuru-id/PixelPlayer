@@ -343,4 +343,14 @@
     <string name="download_error_open_file">Could not open target file</string>
     <string name="download_error_publish">Failed to save file</string>
     <string name="extensions_registry_compatible">Compatible extensions are the SpotiFLAC extensions listed at:</string>
+    <string name="download_filter_songs">Songs</string>
+    <string name="download_filter_albums">Albums</string>
+    <string name="download_filter_artists">Artists</string>
+    <string name="download_filter_playlists">Playlists</string>
+    <string name="download_type_album">Album</string>
+    <string name="download_type_artist">Artist</string>
+    <string name="download_type_playlist">Playlist</string>
+    <string name="download_search_source">Search source</string>
+    <string name="download_top_tracks">Top tracks</string>
+    <string name="download_all">Download all (%1$d)</string>
 </resources>

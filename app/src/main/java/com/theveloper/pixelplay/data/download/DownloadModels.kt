@@ -149,6 +149,58 @@ data class ExtTrack(
     val label: String? = null,
     val copyright: String? = null,
     val composer: String? = null,
+    /** "track" (or empty), "album", "artist" or "playlist" in custom search results. */
+    @SerialName("item_type") val itemType: String? = null,
+    @SerialName("album_id") val albumId: String? = null,
+    @SerialName("artist_id") val artistId: String? = null,
+) {
+    /** Album/artist/playlist result: opens a detail page instead of downloading. */
+    val collectionType: String? get() = collectionTypeOf(itemType)
+}
+
+/** Normalizes extension type/filter ids ("albums", "Artist", "songs") to album/artist/playlist, or null for tracks. */
+fun collectionTypeOf(raw: String?): String? = when (raw?.lowercase()?.removeSuffix("s")) {
+    "album" -> "album"
+    "artist" -> "artist"
+    "playlist" -> "playlist"
+    else -> null
+}
+
+@Serializable
+data class SearchFilterOption(val id: String, val label: String = "", val icon: String = "")
+
+/** Manifest searchBehavior: the extension supports customSearch with these filters. */
+@Serializable
+data class SearchBehavior(
+    val enabled: Boolean = false,
+    val placeholder: String = "",
+    val primary: Boolean = false,
+    val filters: List<SearchFilterOption> = emptyList(),
+)
+
+/** Album/playlist/artist header from GetProviderMetadataJSON (album_info, artist_info, albums[]...). */
+@Serializable
+data class CollectionInfo(
+    val id: String = "",
+    val name: String = "",
+    val artists: String = "",
+    @SerialName("cover_url") val coverUrl: String? = null,
+    @SerialName("release_date") val releaseDate: String? = null,
+    @SerialName("total_tracks") val totalTracks: Int = 0,
+    @SerialName("album_type") val albumType: String? = null,
+    @SerialName("provider_id") val providerId: String? = null,
+)
+
+/** GetProviderMetadataJSON(provider, "album"|"playlist"|"artist", id). */
+@Serializable
+data class ProviderMetadata(
+    @SerialName("album_info") val albumInfo: CollectionInfo? = null,
+    @SerialName("playlist_info") val playlistInfo: CollectionInfo? = null,
+    @SerialName("artist_info") val artistInfo: CollectionInfo? = null,
+    @SerialName("track_list") val trackList: List<ExtTrack> = emptyList(),
+    val albums: List<CollectionInfo> = emptyList(),
+    val releases: List<CollectionInfo> = emptyList(),
+    @SerialName("top_tracks") val topTracks: List<ExtTrack> = emptyList(),
 )
 
 @Serializable
@@ -175,7 +227,9 @@ data class InstalledExtension(
     @SerialName("has_metadata_provider") val hasMetadataProvider: Boolean = false,
     @SerialName("has_download_provider") val hasDownloadProvider: Boolean = false,
     val capabilities: JsonObject? = null,
+    @SerialName("search_behavior") val searchBehavior: SearchBehavior? = null,
 ) {
+    val hasCustomSearch: Boolean get() = searchBehavior?.enabled == true
     val displayName: String get() = displayNameRaw.ifEmpty { name.ifEmpty { id } }
     val isDownloadProvider: Boolean get() = hasDownloadProvider || "download_provider" in types
     val hasHomeFeed: Boolean
