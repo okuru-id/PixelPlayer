@@ -311,4 +311,9 @@
     <string name="extensions_registry_load">Load</string>
     <string name="extensions_registry_edit">Change registry URL</string>
     <string name="extensions_registry_clear">Remove registry URL</string>
+    <string name="download_options_title">Download with extension</string>
+    <string name="download_options_extension">Download extension</string>
+    <string name="download_options_quality">Audio quality</string>
+    <string name="download_options_no_provider">No download extension installed. Install one from the Extensions tab.</string>
+    <string name="download_options_download">Download</string>
 </resources>

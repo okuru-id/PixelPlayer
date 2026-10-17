@@ -2,6 +2,7 @@ package com.theveloper.pixelplay.presentation.download
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -36,6 +37,8 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.ModalBottomSheet
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -65,6 +68,7 @@ import com.theveloper.pixelplay.R
 import com.theveloper.pixelplay.presentation.components.MiniPlayerHeight
 import com.theveloper.pixelplay.data.download.DownloadJob
 import com.theveloper.pixelplay.data.download.ExtTrack
+import com.theveloper.pixelplay.data.download.InstalledExtension
 import com.theveloper.pixelplay.data.download.JobStatus
 import com.theveloper.pixelplay.ui.theme.GoogleSansRounded
 
@@ -182,7 +186,7 @@ fun DownloadScreen(
                 verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 items(ui.results, key = { "${it.providerId}:${it.id}" }) { track ->
-                    DownloadResultRow(track = track, onEnqueue = { viewModel.enqueue(track) })
+                    DownloadResultRow(track = track, onEnqueue = { viewModel.requestDownload(track) })
                 }
             }
 
@@ -214,6 +218,15 @@ fun DownloadScreen(
                 prompt = prompt,
                 onSubmit = viewModel::submitAuthCode,
                 onDismiss = viewModel::dismissAuth,
+            )
+        }
+
+        ui.sheetTrack?.let { track ->
+            DownloadOptionsSheet(
+                track = track,
+                providers = ui.downloadProviders,
+                onDownload = { providerId, quality -> viewModel.enqueue(track, quality, providerId) },
+                onDismiss = viewModel::dismissDownloadSheet,
             )
         }
     }
@@ -331,6 +344,132 @@ private fun bytesLine(job: DownloadJob, context: android.content.Context): Strin
         "$status · $received / ${android.text.format.Formatter.formatShortFileSize(context, job.bytesTotal)}"
     } else {
         "$status · $received"
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun DownloadOptionsSheet(
+    track: ExtTrack,
+    providers: List<InstalledExtension>,
+    onDownload: (providerId: String, quality: String) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var selectedProvider by remember(track) {
+        mutableStateOf(providers.firstOrNull()?.id.orEmpty())
+    }
+    val qualityOptions = remember(selectedProvider, providers) {
+        providers.firstOrNull { it.id == selectedProvider }?.manifest?.qualityOptions.orEmpty()
+    }
+    var selectedQuality by remember(selectedProvider) {
+        mutableStateOf(qualityOptions.firstOrNull()?.id ?: "flac")
+    }
+
+    ModalBottomSheet(onDismissRequest = onDismiss) {
+        Column(modifier = Modifier.padding(horizontal = 24.dp)) {
+            Text(
+                text = stringResource(R.string.download_options_title),
+                style = MaterialTheme.typography.titleMedium,
+                fontFamily = GoogleSansRounded,
+                fontWeight = FontWeight.Bold,
+            )
+            Text(
+                text = track.name,
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = GoogleSansRounded,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.padding(top = 2.dp),
+            )
+
+            Text(
+                text = stringResource(R.string.download_options_extension),
+                style = MaterialTheme.typography.labelLarge,
+                fontFamily = GoogleSansRounded,
+                modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
+            )
+            if (providers.isEmpty()) {
+                Text(
+                    text = stringResource(R.string.download_options_no_provider),
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = GoogleSansRounded,
+                    color = MaterialTheme.colorScheme.error,
+                    modifier = Modifier.padding(vertical = 8.dp),
+                )
+            } else {
+                providers.forEach { ext ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { selectedProvider = ext.id }
+                            .padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = selectedProvider == ext.id, onClick = { selectedProvider = ext.id })
+                        Column {
+                            Text(ext.displayName, style = MaterialTheme.typography.bodyMedium, fontFamily = GoogleSansRounded)
+                            Text(
+                                text = ext.id,
+                                style = MaterialTheme.typography.labelSmall,
+                                fontFamily = GoogleSansRounded,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (qualityOptions.isNotEmpty()) {
+                Text(
+                    text = stringResource(R.string.download_options_quality),
+                    style = MaterialTheme.typography.labelLarge,
+                    fontFamily = GoogleSansRounded,
+                    modifier = Modifier.padding(top = 16.dp, bottom = 4.dp),
+                )
+                qualityOptions.forEach { q ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clip(RoundedCornerShape(12.dp))
+                            .clickable { selectedQuality = q.id }
+                            .padding(vertical = 6.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        RadioButton(selected = selectedQuality == q.id, onClick = { selectedQuality = q.id })
+                        Column {
+                            Text(
+                                text = q.label.ifEmpty { q.id },
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontFamily = GoogleSansRounded,
+                            )
+                            if (q.description.isNotEmpty()) {
+                                Text(
+                                    text = q.description,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontFamily = GoogleSansRounded,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+
+            Button(
+                onClick = { onDownload(selectedProvider, selectedQuality) },
+                enabled = providers.isNotEmpty(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 16.dp, bottom = 32.dp),
+                shape = RoundedCornerShape(20.dp),
+            ) {
+                Icon(Icons.Rounded.Download, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(Modifier.width(8.dp))
+                Text(stringResource(R.string.download_options_download), fontFamily = GoogleSansRounded)
+            }
+        }
     }
 }
 

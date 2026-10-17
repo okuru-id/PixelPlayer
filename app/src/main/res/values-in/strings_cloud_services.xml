@@ -310,4 +310,9 @@
     <string name="s3_dashboard_folders_synced_count">%1$d folder tersinkron</string>
     <string name="s3_dashboard_music_folders">Folder musik</string>
     <string name="s3_dashboard_no_folders_yet">Belum ada folder</string>
+    <string name="download_options_title">Unduh dengan extension</string>
+    <string name="download_options_extension">Extension pengunduh</string>
+    <string name="download_options_quality">Kualitas audio</string>
+    <string name="download_options_no_provider">Belum ada extension pengunduh terpasang. Instal dari tab Extensions.</string>
+    <string name="download_options_download">Unduh</string>
 </resources>

@@ -60,12 +60,18 @@ class DownloadSettings @Inject constructor(@ApplicationContext private val conte
         get() = prefs.getString(KEY_REGISTRY_URL, null)
         set(value) = prefs.edit().putString(KEY_REGISTRY_URL, value).apply()
 
+    /** Last-chosen download provider extension id; remembered across sessions. */
+    var defaultProvider: String?
+        get() = prefs.getString(KEY_DEFAULT_PROVIDER, null)
+        set(value) = prefs.edit().putString(KEY_DEFAULT_PROVIDER, value).apply()
+
     fun clearSafTree() = prefs.edit().remove(KEY_TREE_URI).apply()
 
     private companion object {
         const val KEY_TREE_URI = "saf_tree_uri"
         const val KEY_QUALITY = "default_quality"
         const val KEY_REGISTRY_URL = "registry_url"
+        const val KEY_DEFAULT_PROVIDER = "default_download_provider"
         const val KEY_MASTER_KEY = "extension_master_key"
     }
 }

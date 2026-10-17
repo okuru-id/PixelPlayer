@@ -11,6 +11,7 @@ import com.theveloper.pixelplay.data.download.DownloadRepository
 import com.theveloper.pixelplay.data.download.DownloadSettings
 import com.theveloper.pixelplay.data.download.DownloadWorker
 import com.theveloper.pixelplay.data.download.ExtTrack
+import com.theveloper.pixelplay.data.download.InstalledExtension
 import com.theveloper.pixelplay.data.download.JobStatus
 import dagger.hilt.android.lifecycle.HiltViewModel
 import androidx.lifecycle.ViewModel
@@ -55,12 +56,16 @@ class DownloadViewModel @Inject constructor(
         val safFolderSet: Boolean = false,
         val authRequestId: String? = null,
         val authPrompt: String? = null,
+        val downloadProviders: List<InstalledExtension> = emptyList(),
+        /** Track awaiting the extension/quality picker sheet; null when hidden. */
+        val sheetTrack: ExtTrack? = null,
     )
 
     private val _ui = MutableStateFlow(UiState(safFolderSet = settings.safTreeUri != null))
     val ui: StateFlow<UiState> = _ui.asStateFlow()
 
     init {
+        loadDownloadProviders()
         viewModelScope.launch {
             repository.jobs.collect { jobs ->
                 _ui.update { it.copy(jobs = jobs, safFolderSet = settings.safTreeUri != null) }
@@ -74,6 +79,33 @@ class DownloadViewModel @Inject constructor(
 
     fun onQueryChange(query: String) = _ui.update { it.copy(query = query) }
 
+    private fun loadDownloadProviders() {
+        viewModelScope.launch(Dispatchers.IO) {
+            val installed = runCatching { backend.listInstalled() }.getOrDefault(emptyList())
+            val providers = installed.filter { it.isDownloadProvider && it.enabled && it.error == null }
+            _ui.update { it.copy(downloadProviders = providers) }
+        }
+    }
+
+    /** Tap download: open the extension/quality picker sheet first. */
+    fun requestDownload(track: ExtTrack) {
+        _ui.update { it.copy(sheetTrack = track) }
+    }
+
+    fun dismissDownloadSheet() = _ui.update { it.copy(sheetTrack = null) }
+
+    fun enqueue(track: ExtTrack, quality: String, providerId: String) {
+        _ui.update { it.copy(sheetTrack = null) }
+        if (settings.safTreeUri == null) {
+            _ui.update { it.copy(error = context.getString(R.string.download_pick_folder_first)) }
+            return
+        }
+        settings.defaultQuality = quality
+        settings.defaultProvider = providerId
+        repository.enqueue(track, quality, providerId)
+        DownloadWorker.enqueue(context)
+    }
+
     fun search(query: String) = viewModelScope.launch(Dispatchers.IO) {
         _ui.update { it.copy(query = query, searching = true) }
         val tracks = runCatching { backend.search(query) }.getOrElse { emptyList() }
@@ -84,15 +116,6 @@ class DownloadViewModel @Inject constructor(
                 error = if (tracks.isEmpty()) context.getString(R.string.download_no_results) else null,
             )
         }
-    }
-
-    fun enqueue(track: ExtTrack) {
-        if (settings.safTreeUri == null) {
-            _ui.update { it.copy(error = context.getString(R.string.download_pick_folder_first)) }
-            return
-        }
-        repository.enqueue(track, settings.defaultQuality)
-        DownloadWorker.enqueue(context)
     }
 
     fun onFolderPicked(uri: String) {

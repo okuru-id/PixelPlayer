@@ -67,6 +67,7 @@ class DownloadWorker @AssistedInject constructor(
             outputPath = workFile.absolutePath,
             outputExt = if (job.quality == "flac") "flac" else "",
             quality = job.quality,
+            downloadProvider = job.downloadProvider,
             embedMetadata = true,
             itemId = job.itemId,
             durationMs = job.track.durationMs,

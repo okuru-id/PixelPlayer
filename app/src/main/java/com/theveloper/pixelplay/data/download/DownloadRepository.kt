@@ -14,6 +14,7 @@ data class DownloadJob(
     val itemId: String = UUID.randomUUID().toString(),
     val track: ExtTrack,
     val quality: String,
+    val downloadProvider: String = "",
     val status: JobStatus = JobStatus.QUEUED,
     val progress: Float = 0f,
     val bytesReceived: Long = 0,
@@ -33,8 +34,8 @@ class DownloadRepository @Inject constructor() {
     private val _jobs = MutableStateFlow<List<DownloadJob>>(emptyList())
     val jobs: StateFlow<List<DownloadJob>> = _jobs.asStateFlow()
 
-    fun enqueue(track: ExtTrack, quality: String): String {
-        val job = DownloadJob(track = track, quality = quality)
+    fun enqueue(track: ExtTrack, quality: String, downloadProvider: String): String {
+        val job = DownloadJob(track = track, quality = quality, downloadProvider = downloadProvider)
         _jobs.update { list -> list + job }
         return job.itemId
     }

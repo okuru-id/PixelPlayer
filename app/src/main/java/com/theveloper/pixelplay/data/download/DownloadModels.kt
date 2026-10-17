@@ -99,11 +99,22 @@ data class ExtTrack(
 )
 
 @Serializable
+data class QualityOption(
+    val id: String,
+    val label: String = "",
+    val description: String = "",
+)
+
+@Serializable
 data class ExtensionManifest(
     val name: String = "",
     @SerialName("display_name") val displayName: String = "",
     val version: String = "",
     val description: String? = null,
+    // Go manifest emits an array of types ("metadata_provider",
+    // "download_provider", "lyrics_provider") under the JSON key "type".
+    @SerialName("type") val types: List<String> = emptyList(),
+    @SerialName("qualityOptions") val qualityOptions: List<QualityOption> = emptyList(),
 )
 
 @Serializable
@@ -116,6 +127,7 @@ data class InstalledExtension(
 ) {
     val displayName: String get() = manifest.displayName.ifEmpty { manifest.name.ifEmpty { id } }
     val version: String get() = manifest.version
+    val isDownloadProvider: Boolean get() = manifest.types.contains("download_provider")
 }
 
 /**
