@@ -64,6 +64,10 @@ class DownloadViewModel @Inject constructor(
         viewModelScope.launch {
             repository.jobs.collect { jobs ->
                 _ui.update { it.copy(jobs = jobs, safFolderSet = settings.safTreeUri != null) }
+                // Surface the auth dialog whenever a download fails with
+                // errorType == verification_required (e.g. Spotify/Amazon need
+                // login verification before downloading).
+                checkPendingAuth()
             }
         }
     }
@@ -137,10 +141,15 @@ class DownloadViewModel @Inject constructor(
 
     fun submitAuthCode(code: String) {
         val id = _ui.value.authRequestId ?: return
+        _ui.update { it.copy(authRequestId = null, authPrompt = null) }
         viewModelScope.launch(Dispatchers.IO) {
             runCatching { backend.submitAuthCode(id, code) }
+            // Retry the failed downloads now that the extension is authenticated.
+            _ui.value.jobs
+                .filter { it.errorType == "verification_required" && it.track.providerId == id }
+                .forEach { repository.retry(it.itemId) }
+            DownloadWorker.enqueue(context)
         }
-        _ui.update { it.copy(authRequestId = null, authPrompt = null) }
     }
 
     fun cancel(itemId: String) {
