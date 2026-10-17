@@ -6,6 +6,7 @@ import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.net.Uri
+import android.os.Bundle
 import android.os.Build
 import android.os.SystemClock
 import android.util.LruCache
@@ -39,6 +40,7 @@ import androidx.media3.extractor.flac.FlacExtractor
 import com.theveloper.pixelplay.data.diagnostics.PerformanceMetrics
 import com.theveloper.pixelplay.data.model.TransitionSettings
 import com.theveloper.pixelplay.data.telegram.TelegramRepository
+import com.theveloper.pixelplay.utils.MediaItemBuilder
 import com.theveloper.pixelplay.utils.envelope
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.CoroutineScope
@@ -220,6 +222,7 @@ class DualPlayerEngine @Inject constructor(
     private val navidromeStreamProxy: NavidromeStreamProxy,
     private val jellyfinStreamProxy: com.theveloper.pixelplay.data.jellyfin.JellyfinStreamProxy,
     private val gdriveStreamProxy: com.theveloper.pixelplay.data.gdrive.GDriveStreamProxy,
+    private val s3StreamProxy: com.theveloper.pixelplay.data.s3.S3StreamProxy,
     private val telegramCacheManager: com.theveloper.pixelplay.data.telegram.TelegramCacheManager,
     private val connectivityStateHolder: com.theveloper.pixelplay.presentation.viewmodel.ConnectivityStateHolder
 ) {
@@ -234,10 +237,10 @@ class DualPlayerEngine @Inject constructor(
         private const val POST_TRANSITION_OFFLOAD_GUARD_MS = 2_000L
         private const val MAX_AUXILIARY_TIMELINE_ITEMS = 200
         private val LOCAL_MEDIA_SCHEMES = setOf("content", "file", "android.resource")
-        private val REMOTE_MEDIA_SCHEMES = setOf("http", "https", "telegram", "netease", "qqmusic", "navidrome", "jellyfin", "gdrive")
+        private val REMOTE_MEDIA_SCHEMES = setOf("http", "https", "telegram", "netease", "qqmusic", "navidrome", "jellyfin", "gdrive", "s3")
         // Subset of REMOTE_MEDIA_SCHEMES: schemes that need proxy resolution.
         // http/https resolve directly and must NOT enter the resolvedUriCache lookup path.
-        private val CLOUD_PROXY_SCHEMES = setOf("telegram", "netease", "qqmusic", "navidrome", "jellyfin", "gdrive")
+        private val CLOUD_PROXY_SCHEMES = setOf("telegram", "netease", "qqmusic", "navidrome", "jellyfin", "gdrive", "s3")
     }
 
     data class TransitionTarget(
@@ -1204,6 +1207,7 @@ class DualPlayerEngine @Inject constructor(
             "navidrome" -> resolveNavidromeUriAsync(uriString)
             "jellyfin" -> resolveJellyfinUriAsync(uriString)
             "gdrive" -> resolveGDriveUriAsync(uriString)
+            "s3" -> resolveS3UriAsync(uriString)
             else -> null
         }
 
@@ -1269,6 +1273,15 @@ class DualPlayerEngine @Inject constructor(
         gdriveStreamProxy.resolveGDriveUri(uriString)?.toUri()
     }
 
+    private suspend fun resolveS3UriAsync(uriString: String): Uri? = withContext(Dispatchers.IO) {
+        if (!connectivityStateHolder.isOnline.value) {
+            connectivityStateHolder.triggerOfflineBlockedEvent()
+            return@withContext null
+        }
+        if (!s3StreamProxy.ensureReady(5_000L)) return@withContext null
+        s3StreamProxy.resolveS3Uri(uriString)?.toUri()
+    }
+
     suspend fun resolveMediaItem(mediaItem: MediaItem): MediaItem {
         val uri = mediaItem.localConfiguration?.uri ?: return mediaItem
         val scheme = uri.scheme
@@ -1276,7 +1289,15 @@ class DualPlayerEngine @Inject constructor(
         // reach resolveCloudUri, so checking them wastes an IO dispatch.
         if (scheme !in CLOUD_PROXY_SCHEMES) return mediaItem
         val resolvedUri = resolveCloudUri(uri)
-        return if (resolvedUri == uri) mediaItem else mediaItem.buildUpon().setUri(resolvedUri).build()
+        if (resolvedUri == uri) return mediaItem
+        // Keep the original cloud URI in extras so queue persistence never stores a
+        // stale loopback proxy URL (its port dies with the process).
+        val metadata = mediaItem.mediaMetadata.buildUpon()
+            .setExtras((mediaItem.mediaMetadata.extras ?: Bundle()).apply {
+                putString(MediaItemBuilder.ORIGINAL_CONTENT_URI, uri.toString())
+            })
+            .build()
+        return mediaItem.buildUpon().setUri(resolvedUri).setMediaMetadata(metadata).build()
     }
 
     suspend fun prepareNext(target: TransitionTarget, startPositionMs: Long = 0L) {
