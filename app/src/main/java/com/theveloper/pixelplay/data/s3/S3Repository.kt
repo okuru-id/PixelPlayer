@@ -29,6 +29,7 @@ import java.io.IOException
 import javax.inject.Inject
 import javax.inject.Singleton
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
@@ -38,6 +39,8 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.Semaphore
@@ -304,11 +307,19 @@ class S3Repository @Inject constructor(
     /** Mirrors all s3_songs into the unified `songs` table. */
     suspend fun refreshUnifiedLibrary() = resyncUnifiedLibrary()
 
+    /** Re-mirrors S3 whenever on-device songs come or go, so local copies keep hiding their S3 twins. */
+    @OptIn(FlowPreview::class)
+    suspend fun hideTracksWithLocalCopies() {
+        musicDao.observeLocalSongCount().distinctUntilChanged().debounce(2_000).collect {
+            if (_isLoggedInFlow.value) runCatching { resyncUnifiedLibrary() }.onFailure { Timber.e(it, "S3 resync failed") }
+        }
+    }
+
     private suspend fun resyncUnifiedLibrary() {
         // A track that is also on the device stays local-only: its S3 copy is left out of the
         // library (and removed if it was mirrored before) until the local file goes away.
         val localTracks = LocalTrackIndex(musicDao.getLocalSongMatchKeys())
-        val s3Songs = dao.getAllS3SongsList().filterNot { localTracks.hasLocalCopy(it.title, it.artist, it.duration) }
+        val s3Songs = dao.getAllS3SongsList().filterNot { localTracks.hasLocalCopy(it.title, it.artist, it.duration, it.objectKey) }
         val existingUnifiedIds = musicDao.getAllS3SongIds()
 
         if (s3Songs.isEmpty()) {

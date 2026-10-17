@@ -11,6 +11,10 @@ class LocalTrackIndexTest {
         listOf(
             SongMatchKey(title = "Gymnopédie No. 1", artistName = "Kevin MacLeod", duration = 182_000),
             SongMatchKey(title = "Local Forecast", artistName = "Kevin MacLeod, Someone", duration = 0),
+            SongMatchKey(
+                title = "Sneaky Snitch", artistName = "<unknown>", duration = 136_000,
+                filePath = "/storage/emulated/0/Music/Kevin MacLeod - Sneaky Snitch.mp3",
+            ),
         )
     )
 
@@ -38,8 +42,19 @@ class LocalTrackIndexTest {
 
     @Test
     fun `different artist or title is not a copy`() {
-        assertFalse(index.hasLocalCopy("Gymnopédie No. 1", "Erik Satie", 182_000))
+        assertFalse(index.hasLocalCopy("Gymnopédie No. 1", "Erik Satie", 240_000))
         assertFalse(index.hasLocalCopy("Gymnopédie No. 2", "Kevin MacLeod", 182_000))
         assertFalse(index.hasLocalCopy("", "Kevin MacLeod", 182_000))
+    }
+
+    @Test
+    fun `same title and length match even when the artist differs`() {
+        assertTrue(index.hasLocalCopy("Sneaky Snitch", "Kevin MacLeod", 137_000))
+    }
+
+    @Test
+    fun `same file name is a local copy`() {
+        assertTrue(index.hasLocalCopy("01 sneaky", "Unknown Artist", 0, "music/Kevin MacLeod - Sneaky Snitch.flac"))
+        assertFalse(index.hasLocalCopy("Other", "Unknown Artist", 0, "music/Other.flac"))
     }
 }

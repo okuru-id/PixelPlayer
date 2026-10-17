@@ -57,8 +57,7 @@ class SyncWorkerTest {
                     lyricsRepository = mockk(relaxed = true),
                     telegramDao = mockk(relaxed = true),
                     neteaseDao = mockk(relaxed = true),
-                    navidromeRepository = mockk(relaxed = true),
-                    s3Repository = mockk(relaxed = true)
+                    navidromeRepository = mockk(relaxed = true)
                 )
             } else {
                 null
