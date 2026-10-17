@@ -60,6 +60,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.theveloper.pixelplay.R
+import com.theveloper.pixelplay.presentation.components.MiniPlayerHeight
 import com.theveloper.pixelplay.presentation.screens.TabAnimation
 import com.theveloper.pixelplay.data.download.InstalledExtension
 import com.theveloper.pixelplay.data.download.RepoExtension
@@ -130,6 +131,8 @@ fun ExtensionsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                // Clear the main screen's bottom nav + mini player overlay.
+                .padding(bottom = MiniPlayerHeight + 24.dp)
                 .padding(horizontal = 16.dp),
         ) {
             if (ui.installing) {

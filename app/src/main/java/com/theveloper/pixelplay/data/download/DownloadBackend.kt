@@ -1,6 +1,7 @@
 package com.theveloper.pixelplay.data.download
 
 import kotlinx.serialization.Serializable
+import android.util.Log
 import java.io.File
 import javax.inject.Inject
 import javax.inject.Singleton
@@ -39,6 +40,8 @@ class GobackendDownloadBackend @Inject constructor(
     private val settings: DownloadSettings,
 ) : DownloadBackendApi {
 
+    private companion object { const val TAG = "DownloadBackend" }
+
     private val lock = Any()
     private var initialized = false
 
@@ -74,6 +77,7 @@ class GobackendDownloadBackend @Inject constructor(
             val id = DownloadJson.decodeFromString<InstallResult>(raw.ifEmpty { "{}" })
             BackendResult.Ok(listInstalled().firstOrNull { it.id == id.name })
         }.getOrElse {
+            Log.e(TAG, "installFromFile($path) failed", it)
             BackendResult.Failed(
                 DownloadResponse(success = false, error = it.message, errorType = "install_failed"),
             )
@@ -90,7 +94,7 @@ class GobackendDownloadBackend @Inject constructor(
             DownloadJson.decodeFromString<List<RepoExtension>>(
                 gobackend.Gobackend.getRepoExtensionsJSON(forceRefresh),
             )
-        }.getOrDefault(emptyList())
+        }.onFailure { Log.e(TAG, "listRepoExtensions failed", it) }.getOrDefault(emptyList())
     }
 
     override fun setRegistryUrl(url: String): String? {
@@ -118,6 +122,7 @@ class GobackendDownloadBackend @Inject constructor(
             val destPath = gobackend.Gobackend.downloadRepoExtensionJSON(id, dir.absolutePath)
             installFromFile(destPath)
         }.getOrElse {
+            Log.e(TAG, "installFromRepo($id) failed", it)
             BackendResult.Failed(
                 DownloadResponse(success = false, error = it.message, errorType = "repo_download_failed"),
             )

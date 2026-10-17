@@ -62,6 +62,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.theveloper.pixelplay.R
+import com.theveloper.pixelplay.presentation.components.MiniPlayerHeight
 import com.theveloper.pixelplay.data.download.DownloadJob
 import com.theveloper.pixelplay.data.download.ExtTrack
 import com.theveloper.pixelplay.data.download.JobStatus
@@ -122,6 +123,8 @@ fun DownloadScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(paddingValues)
+                // Clear the main screen's bottom nav + mini player overlay.
+                .padding(bottom = MiniPlayerHeight + 24.dp)
                 .padding(horizontal = 16.dp),
         ) {
             if (!ui.safFolderSet) {
