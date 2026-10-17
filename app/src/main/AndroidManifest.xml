@@ -253,6 +253,13 @@
             android:name=".data.service.wear.WatchTransferForegroundService"
             android:foregroundServiceType="dataSync"
             android:exported="false" />
+
+        <!-- WorkManager runs DownloadWorker via setForeground(dataSync); the library
+             manifest declares no type, which crashes on API 34+. -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            android:foregroundServiceType="dataSync"
+            tools:node="merge" />
         <meta-data
             android:name="preloaded_fonts"
             android:resource="@array/preloaded_fonts" />
