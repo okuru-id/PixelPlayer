@@ -53,6 +53,7 @@ import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -75,13 +76,13 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import coil.compose.AsyncImage
 import com.theveloper.pixelplay.R
-import com.theveloper.pixelplay.presentation.components.MiniPlayerHeight
 import com.theveloper.pixelplay.data.download.DownloadJob
 import com.theveloper.pixelplay.data.download.ExtTrack
 import com.theveloper.pixelplay.data.download.FeedItem
 import com.theveloper.pixelplay.data.download.FeedSection
 import com.theveloper.pixelplay.data.download.InstalledExtension
 import com.theveloper.pixelplay.data.download.JobStatus
+import com.theveloper.pixelplay.presentation.components.MiniPlayerHeight
 import com.theveloper.pixelplay.ui.theme.GoogleSansRounded
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -195,6 +196,7 @@ fun DownloadScreen(
                     sections = ui.feed,
                     loading = ui.feedLoading,
                     onItemClick = viewModel::openFeedItem,
+                    onRefresh = viewModel::loadFeed,
                     modifier = Modifier
                         .fillMaxWidth()
                         .weight(1f),
@@ -274,24 +276,24 @@ fun DownloadScreen(
     }
 }
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun FeedCatalog(
     sections: List<FeedSection>,
     loading: Boolean,
     onItemClick: (FeedItem) -> Unit,
+    onRefresh: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    if (sections.isEmpty()) {
-        Box(modifier, contentAlignment = Alignment.Center) {
-            if (loading) CircularProgressIndicator()
-        }
-        return
-    }
+    // Pull down to reload the extension home feed; the old sections stay visible meanwhile.
+    PullToRefreshBox(isRefreshing = loading, onRefresh = onRefresh, modifier = modifier) {
     LazyColumn(
-        modifier = modifier,
+        modifier = Modifier.fillMaxSize(),
         contentPadding = PaddingValues(vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(20.dp),
     ) {
+        // Empty feed still needs a scrollable child, or the pull gesture never reaches the box.
+        if (sections.isEmpty()) item { Spacer(Modifier.fillParentMaxSize()) }
         items(sections, key = { "${it.uri}:${it.title}" }) { section ->
             Column {
                 Text(
@@ -310,6 +312,7 @@ private fun FeedCatalog(
                 }
             }
         }
+    }
     }
 }
 
