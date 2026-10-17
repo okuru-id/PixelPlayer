@@ -335,4 +335,14 @@
     <string name="download_error_open_file">Не удалось открыть целевой файл</string>
     <string name="download_error_publish">Не удалось сохранить файл</string>
     <string name="extensions_registry_compatible">Совместимые расширения — это расширения SpotiFLAC из списка на сайте:</string>
+    <string name="download_filter_songs">Треки</string>
+    <string name="download_filter_albums">Альбомы</string>
+    <string name="download_filter_artists">Исполнители</string>
+    <string name="download_filter_playlists">Плейлисты</string>
+    <string name="download_type_album">Альбом</string>
+    <string name="download_type_artist">Исполнитель</string>
+    <string name="download_type_playlist">Плейлист</string>
+    <string name="download_search_source">Источник поиска</string>
+    <string name="download_top_tracks">Популярные треки</string>
+    <string name="download_all">Скачать все (%1$d)</string>
 </resources>

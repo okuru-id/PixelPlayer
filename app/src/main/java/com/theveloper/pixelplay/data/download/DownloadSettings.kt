@@ -65,6 +65,11 @@ class DownloadSettings @Inject constructor(@ApplicationContext private val conte
         get() = prefs.getString(KEY_DEFAULT_PROVIDER, null)
         set(value) = prefs.edit().putString(KEY_DEFAULT_PROVIDER, value).apply()
 
+    /** Extension used for search (customSearch); null = combined metadata search. */
+    var searchProvider: String?
+        get() = prefs.getString(KEY_SEARCH_PROVIDER, null)
+        set(value) = prefs.edit().putString(KEY_SEARCH_PROVIDER, value).apply()
+
     fun clearSafTree() = prefs.edit().remove(KEY_TREE_URI).apply()
 
     private companion object {
@@ -72,6 +77,7 @@ class DownloadSettings @Inject constructor(@ApplicationContext private val conte
         const val KEY_QUALITY = "default_quality"
         const val KEY_REGISTRY_URL = "registry_url"
         const val KEY_DEFAULT_PROVIDER = "default_download_provider"
+        const val KEY_SEARCH_PROVIDER = "search_provider"
         const val KEY_MASTER_KEY = "extension_master_key"
     }
 }

@@ -1,6 +1,8 @@
 package com.theveloper.pixelplay.data.download
 
 import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import android.util.Log
 import java.io.File
 import javax.inject.Inject
@@ -28,6 +30,10 @@ interface DownloadBackendApi {
     fun setEnabled(id: String, enabled: Boolean)
     fun search(query: String, limit: Int = 30): List<ExtTrack>
     fun homeFeed(extensionId: String): HomeFeed
+    /** Extension customSearch with a manifest filter id; throws with the extension's message on failure. */
+    fun customSearch(extensionId: String, query: String, filter: String?, limit: Int = 30): List<ExtTrack>
+    /** Album/playlist/artist details from a metadata extension; throws on failure. */
+    fun providerMetadata(providerId: String, type: String, id: String): ProviderMetadata
     fun download(request: DownloadRequest): BackendResult<DownloadResponse>
     fun progressDelta(sinceSeq: Long): ProgressDelta
     fun waitProgressDelta(sinceSeq: Long, timeoutMs: Long): ProgressDelta
@@ -171,6 +177,25 @@ class GobackendDownloadBackend @Inject constructor(
             Log.e(TAG, "homeFeed($extensionId) failed", it)
             HomeFeed(error = it.message)
         }.also { Log.d(TAG, "homeFeed($extensionId): ${it.sections.size} sections, error=${it.error}") }
+    }
+
+    override fun customSearch(extensionId: String, query: String, filter: String?, limit: Int): List<ExtTrack> {
+        initIfNeeded()
+        val options = buildJsonObject {
+            filter?.let { put("filter", it) }
+            put("limit", limit)
+        }
+        val raw = gobackend.Gobackend.customSearchWithExtensionJSON(extensionId, query, options.toString())
+        // Go sets provider_id on every result; keep the extension id as a fallback.
+        return DownloadJson.decodeFromString<List<ExtTrack>>(raw.ifEmpty { "[]" })
+            .map { if (it.providerId.isBlank()) it.copy(providerId = extensionId) else it }
+            .also { Log.d(TAG, "customSearch($extensionId, filter=$filter): ${it.size} results") }
+    }
+
+    override fun providerMetadata(providerId: String, type: String, id: String): ProviderMetadata {
+        initIfNeeded()
+        val raw = gobackend.Gobackend.getProviderMetadataJSON(providerId, type, id)
+        return DownloadJson.decodeFromString<ProviderMetadata>(raw.ifEmpty { "{}" })
     }
 
     override fun download(request: DownloadRequest): BackendResult<DownloadResponse> {
