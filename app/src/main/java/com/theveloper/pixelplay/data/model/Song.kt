@@ -4,6 +4,10 @@ import android.os.Parcelable
 import androidx.compose.runtime.Immutable
 import kotlinx.parcelize.Parcelize
 
+private val CLOUD_URI_SCHEMES = listOf(
+    "telegram://", "netease://", "qqmusic://", "navidrome://", "jellyfin://", "gdrive://", "s3://",
+)
+
 @Immutable
 @Parcelize
 data class Song(
@@ -44,6 +48,10 @@ data class Song(
     val jellyfinId: String? = null, // Jellyfin item ID
     val s3ObjectKey: String? = null // S3-compatible object key
 ) : Parcelable {
+    /** True when the song streams from a cloud source rather than a file on this device. */
+    val isCloud: Boolean
+        get() = CLOUD_URI_SCHEMES.any { contentUriString.startsWith(it, ignoreCase = true) }
+
     /**
      * Returns the display string for artists.
      * If multiple artists exist (populated during sync), joins them with ", ".
