@@ -342,10 +342,6 @@
     <string name="download_error_open_file">Tidak dapat membuka file tujuan</string>
     <string name="download_error_publish">Gagal menyimpan file</string>
     <string name="extensions_registry_compatible">Ekstensi yang kompatibel adalah ekstensi SpotiFLAC dari:</string>
-    <string name="download_filter_songs">Lagu</string>
-    <string name="download_filter_albums">Album</string>
-    <string name="download_filter_artists">Artis</string>
-    <string name="download_filter_playlists">Playlist</string>
     <string name="download_type_album">Album</string>
     <string name="download_type_artist">Artis</string>
     <string name="download_type_playlist">Playlist</string>

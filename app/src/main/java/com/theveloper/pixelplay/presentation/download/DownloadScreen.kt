@@ -47,6 +47,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExperimentalMaterial3ExpressiveApi
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -76,6 +77,7 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -438,10 +440,19 @@ private fun SearchSourceBar(
     ) {
         item {
             Box {
-                AssistChip(
+                FilterChip(
+                    selected = false,
                     onClick = { menuOpen = true },
                     label = { Text(selected?.displayName.orEmpty(), fontFamily = GoogleSansRounded) },
+                    leadingIcon = { Icon(Icons.Rounded.Extension, contentDescription = null, modifier = Modifier.size(FilterChipDefaults.IconSize)) },
                     trailingIcon = { Icon(Icons.Rounded.ArrowDropDown, contentDescription = stringResource(R.string.download_search_source)) },
+                    shape = CircleShape,
+                    border = null,
+                    colors = FilterChipDefaults.filterChipColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer,
+                        labelColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                        iconColor = MaterialTheme.colorScheme.onTertiaryContainer,
+                    ),
                 )
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                     providers.forEach { ext ->
@@ -457,10 +468,30 @@ private fun SearchSourceBar(
             }
         }
         items(selected?.searchBehavior?.filters.orEmpty(), key = { it.id }) { option ->
+            // Same pill chips as the library SearchScreen filters.
+            val isSelected = option.id == filter
             FilterChip(
-                selected = option.id == filter,
+                selected = isSelected,
                 onClick = { onFilter(option.id) },
                 label = { Text(filterLabel(option), fontFamily = GoogleSansRounded) },
+                shape = CircleShape,
+                border = null,
+                colors = FilterChipDefaults.filterChipColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer,
+                    labelColor = MaterialTheme.colorScheme.onSecondaryContainer,
+                    selectedContainerColor = MaterialTheme.colorScheme.primary,
+                    selectedLabelColor = MaterialTheme.colorScheme.onPrimary,
+                ),
+                leadingIcon = if (isSelected) {
+                    {
+                        Icon(
+                            painter = painterResource(R.drawable.rounded_check_circle_24),
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.size(FilterChipDefaults.IconSize),
+                        )
+                    }
+                } else null,
             )
         }
     }
@@ -469,10 +500,10 @@ private fun SearchSourceBar(
 @Composable
 private fun filterLabel(option: SearchFilterOption): String =
     when (collectionTypeOf(option.id) ?: option.id.lowercase().removeSuffix("s")) {
-        "album" -> stringResource(R.string.download_filter_albums)
-        "artist" -> stringResource(R.string.download_filter_artists)
-        "playlist" -> stringResource(R.string.download_filter_playlists)
-        "track", "song" -> stringResource(R.string.download_filter_songs)
+        "album" -> stringResource(R.string.library_tab_albums)
+        "artist" -> stringResource(R.string.library_tab_artists)
+        "playlist" -> stringResource(R.string.library_tab_playlists)
+        "track", "song" -> stringResource(R.string.library_tab_songs)
         else -> option.label.ifEmpty { option.id }
     }
 
@@ -638,7 +669,7 @@ private fun DetailPane(
             DownloadResultRow(track = track, onEnqueue = { onDownload(track) })
         }
         if (detail.albums.isNotEmpty()) {
-            item(key = "albums-title") { SectionTitle(stringResource(R.string.download_filter_albums)) }
+            item(key = "albums-title") { SectionTitle(stringResource(R.string.library_tab_albums)) }
             items(detail.albums, key = { "a:${it.id}" }) { album ->
                 CollectionRow(
                     title = album.name,
