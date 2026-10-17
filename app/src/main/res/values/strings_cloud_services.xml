@@ -320,4 +320,27 @@
     <string name="download_auth_open">Open browser</string>
     <string name="download_auth_success">Verification complete — retrying downloads</string>
     <string name="download_auth_failed">Verification failed — try again</string>
+    <string name="extensions_type_metadata">Metadata</string>
+    <string name="extensions_type_download">Download</string>
+    <string name="extensions_type_lyrics">Lyrics</string>
+    <string name="extensions_registry_guide_title">How to get a registry URL</string>
+    <string name="extensions_registry_guide_1">A registry is a registry.json manifest listing extensions (id, name, version, download_url, sha256). Ask the extension author or community for its link.</string>
+    <string name="extensions_registry_guide_2">GitHub repository: paste the repo link, e.g. https://github.com/owner/repo — registry.json is read from its default branch.</string>
+    <string name="extensions_registry_guide_3">Direct link: paste the raw JSON URL, e.g. https://raw.githubusercontent.com/owner/repo/main/registry.json or any https URL that returns JSON.</string>
+    <string name="extensions_registry_guide_4">Make sure it opens as JSON in a browser, not a web page. Only add registries you trust: extensions run code on your device.</string>
+    <string name="extensions_type_utility">Utility</string>
+    <string name="extensions_type_integration">Integration</string>
+    <string name="download_notif_channel">Music downloads</string>
+    <string name="download_notif_starting">Starting download…</string>
+    <string name="download_notif_decrypting">Decrypting %1$s…</string>
+    <string name="download_notif_progress">Downloading %1$s · %2$d%%</string>
+    <string name="download_error_no_folder">No download folder selected</string>
+    <string name="download_error_failed">Download failed</string>
+    <string name="download_error_no_file">Backend returned no file</string>
+    <string name="download_error_decrypt">Failed to decrypt encrypted stream</string>
+    <string name="download_error_folder_unavailable">Download folder unavailable — reselect it</string>
+    <string name="download_error_create_file">Could not create file in download folder</string>
+    <string name="download_error_open_file">Could not open target file</string>
+    <string name="download_error_publish">Failed to save file</string>
+    <string name="extensions_registry_compatible">Compatible extensions are the SpotiFLAC extensions listed at:</string>
 </resources>

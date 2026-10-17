@@ -18,6 +18,7 @@ import androidx.work.ForegroundInfo
 import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
+import com.theveloper.pixelplay.R
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
 import java.io.File
@@ -44,11 +45,11 @@ class DownloadWorker @AssistedInject constructor(
 
     override suspend fun doWork(): Result = withContext(Dispatchers.IO) {
         ensureNotificationChannel(applicationContext)
-        setForeground(createForegroundInfo("Starting download…"))
+        setForeground(createForegroundInfo(str(R.string.download_notif_starting)))
         while (true) {
             val job = repository.claimNextQueued() ?: break
             val treeUri = settings.safTreeUri ?: run {
-                repository.markFailed(job.itemId, "No download folder selected", "no_folder")
+                repository.markFailed(job.itemId, str(R.string.download_error_no_folder), "no_folder")
                 continue
             }
             process(job, treeUri)
@@ -121,7 +122,7 @@ class DownloadWorker @AssistedInject constructor(
         }
         when (result) {
             is BackendResult.Failed ->
-                repository.markFailed(job.itemId, result.response.error ?: "Download failed", result.response.errorType)
+                repository.markFailed(job.itemId, result.response.error ?: str(R.string.download_error_failed), result.response.errorType)
             is BackendResult.Ok -> finalizeAndPublish(job, treeUri, result.value)
         }
     }
@@ -129,18 +130,18 @@ class DownloadWorker @AssistedInject constructor(
     private fun finalizeAndPublish(job: DownloadJob, treeUri: String, response: DownloadResponse) {
         val path = response.filePath?.takeIf { it.isNotBlank() && !it.startsWith("content://") }
         var file = path?.let(::File)?.takeIf { it.isFile && it.length() > 0 } ?: run {
-            repository.markFailed(job.itemId, "Backend returned no file", "no_file")
+            repository.markFailed(job.itemId, str(R.string.download_error_no_file), "no_file")
             return
         }
         try {
             val decryption = finalizer.decryptionFor(response)
             if (decryption != null && !response.alreadyExists) {
-                notify("Decrypting ${job.track.artists} - ${job.track.name}…")
+                notify(str(R.string.download_notif_decrypting, "${job.track.artists} - ${job.track.name}"))
                 file = try {
                     finalizer.decrypt(file, decryption)
                 } catch (e: Exception) {
                     Log.e(TAG, "Decrypt failed for ${job.itemId}", e)
-                    repository.markFailed(job.itemId, e.message ?: "Failed to decrypt encrypted stream", "decrypt_failed")
+                    repository.markFailed(job.itemId, e.message ?: str(R.string.download_error_decrypt), "decrypt_failed")
                     return
                 }
             }
@@ -173,7 +174,7 @@ class DownloadWorker @AssistedInject constructor(
     private fun publish(src: File, treeUri: String, job: DownloadJob, ext: String): Uri? {
         val dir = DocumentFile.fromTreeUri(applicationContext, Uri.parse(treeUri))
             ?: run {
-                repository.markFailed(job.itemId, "Download folder unavailable — reselect it", "no_folder")
+                repository.markFailed(job.itemId, str(R.string.download_error_folder_unavailable), "no_folder")
                 return null
             }
         val base = sanitize("${job.track.artists.ifEmpty { "Unknown artist" }} - ${job.track.name}")
@@ -182,22 +183,25 @@ class DownloadWorker @AssistedInject constructor(
         while (dir.findFile(name) != null) name = "$base (${n++}).$ext"
         val target = dir.createFile(mimeFor(ext), name)
             ?: run {
-                repository.markFailed(job.itemId, "Could not create file in download folder", "saf_error")
+                repository.markFailed(job.itemId, str(R.string.download_error_create_file), "saf_error")
                 return null
             }
         try {
             applicationContext.contentResolver.openOutputStream(target.uri)?.use { out ->
                 src.inputStream().use { it.copyTo(out, DEFAULT_BUFFER_SIZE * 8) }
             } ?: run {
-                repository.markFailed(job.itemId, "Could not open target file", "saf_error")
+                repository.markFailed(job.itemId, str(R.string.download_error_open_file), "saf_error")
                 return null
             }
         } catch (e: Exception) {
-            repository.markFailed(job.itemId, e.message ?: "Publish failed", "saf_error")
+            repository.markFailed(job.itemId, e.message ?: str(R.string.download_error_publish), "saf_error")
             return null
         }
         return target.uri
     }
+
+    /** applicationContext follows the in-app language (AppCompatDelegate.setApplicationLocales). */
+    private fun str(id: Int, vararg args: Any): String = applicationContext.getString(id, *args)
 
     private fun sanitize(s: String) = s.replace(Regex("[\\\\/:*?\"<>|]"), "_").trim().take(150)
 
@@ -212,7 +216,7 @@ class DownloadWorker @AssistedInject constructor(
 
     private fun updateNotification(job: DownloadJob, delta: ProgressDelta) {
         val p = delta.items[job.itemId] ?: return
-        notify("Downloading ${job.track.artists} - ${job.track.name} · ${p.status} ${(p.progress * 100).toInt()}%")
+        notify(str(R.string.download_notif_progress, "${job.track.artists} - ${job.track.name}", (p.progress * 100).toInt()))
     }
 
     private fun notify(text: String) {
@@ -245,7 +249,7 @@ class DownloadWorker @AssistedInject constructor(
         fun ensureNotificationChannel(context: Context) {
             val channel = NotificationChannel(
                 CHANNEL_ID,
-                "Music downloads",
+                context.getString(R.string.download_notif_channel),
                 NotificationManager.IMPORTANCE_LOW,
             )
             context.getSystemService(NotificationManager::class.java).createNotificationChannel(channel)

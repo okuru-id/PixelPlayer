@@ -79,6 +79,8 @@ class GobackendDownloadBackend @Inject constructor(
         val raw = gobackend.Gobackend.getInstalledExtensions()
         val list = runCatching { DownloadJson.decodeFromString<List<InstalledExtension>>(raw.ifEmpty { "[]" }) }
             .getOrElse { emptyList() }
+            // Go builds this from a map, so the order changes between calls; keep it stable A→Z.
+            .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER, InstalledExtension::displayName).thenBy { it.id })
         Log.d(TAG, "listInstalled: ${list.size} extensions: ${list.map { "${it.id}(types=${it.types},download=${it.isDownloadProvider},enabled=${it.enabled},err=${it.error},qualities=${it.qualityOptions.map(QualityOption::id)})" }}")
         return list
     }
@@ -114,6 +116,7 @@ class GobackendDownloadBackend @Inject constructor(
                 gobackend.Gobackend.getRepoExtensionsJSON(forceRefresh),
             )
         }.onFailure { Log.e(TAG, "listRepoExtensions failed", it) }.getOrDefault(emptyList())
+            .sortedWith(compareBy(String.CASE_INSENSITIVE_ORDER) { it.displayName.ifEmpty { it.name.ifEmpty { it.id } } })
     }
 
     override fun setRegistryUrl(url: String): String? {

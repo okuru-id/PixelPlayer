@@ -319,4 +319,27 @@
     <string name="download_auth_open">Buka browser</string>
     <string name="download_auth_success">Verifikasi selesai — mengulang unduhan</string>
     <string name="download_auth_failed">Verifikasi gagal — coba lagi</string>
+    <string name="extensions_type_metadata">Metadata</string>
+    <string name="extensions_type_download">Unduhan</string>
+    <string name="extensions_type_lyrics">Lirik</string>
+    <string name="extensions_registry_guide_title">Cara mendapatkan URL registry</string>
+    <string name="extensions_registry_guide_1">Registry adalah manifest registry.json berisi daftar ekstensi (id, name, version, download_url, sha256). Minta tautannya dari pembuat ekstensi atau komunitas.</string>
+    <string name="extensions_registry_guide_2">Repositori GitHub: tempel tautan repo, mis. https://github.com/owner/repo — registry.json dibaca dari branch default.</string>
+    <string name="extensions_registry_guide_3">Tautan langsung: tempel URL JSON mentah, mis. https://raw.githubusercontent.com/owner/repo/main/registry.json atau URL https lain yang mengembalikan JSON.</string>
+    <string name="extensions_registry_guide_4">Pastikan URL terbuka sebagai JSON di browser, bukan halaman web. Hanya tambahkan registry tepercaya: ekstensi menjalankan kode di perangkat Anda.</string>
+    <string name="extensions_type_utility">Utilitas</string>
+    <string name="extensions_type_integration">Integrasi</string>
+    <string name="download_notif_channel">Unduhan musik</string>
+    <string name="download_notif_starting">Memulai unduhan…</string>
+    <string name="download_notif_decrypting">Mendekripsi %1$s…</string>
+    <string name="download_notif_progress">Mengunduh %1$s · %2$d%%</string>
+    <string name="download_error_no_folder">Folder unduhan belum dipilih</string>
+    <string name="download_error_failed">Unduhan gagal</string>
+    <string name="download_error_no_file">Backend tidak mengembalikan file</string>
+    <string name="download_error_decrypt">Gagal mendekripsi stream terenkripsi</string>
+    <string name="download_error_folder_unavailable">Folder unduhan tidak tersedia — pilih ulang</string>
+    <string name="download_error_create_file">Tidak dapat membuat file di folder unduhan</string>
+    <string name="download_error_open_file">Tidak dapat membuka file tujuan</string>
+    <string name="download_error_publish">Gagal menyimpan file</string>
+    <string name="extensions_registry_compatible">Ekstensi yang kompatibel adalah ekstensi SpotiFLAC dari:</string>
 </resources>

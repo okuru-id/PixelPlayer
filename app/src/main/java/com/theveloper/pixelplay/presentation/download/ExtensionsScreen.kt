@@ -26,6 +26,7 @@ import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.PrimaryTabRow
 import androidx.compose.material3.Tab
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -51,6 +52,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalUriHandler
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
@@ -332,8 +334,62 @@ private fun RegistryUrlInput(
                 Text(stringResource(R.string.extensions_registry_load), fontFamily = GoogleSansRounded)
             }
         }
+        if (initialUrl.isEmpty()) RegistryGuide()
     }
 }
+
+/** Registry category ids are English keys; show them in the app language. */
+@Composable
+private fun categoryLabel(category: String): String? = when (category.lowercase()) {
+    "" -> null
+    "metadata" -> stringResource(R.string.extensions_type_metadata)
+    "download" -> stringResource(R.string.extensions_type_download)
+    "lyrics" -> stringResource(R.string.extensions_type_lyrics)
+    "utility" -> stringResource(R.string.extensions_type_utility)
+    "integration" -> stringResource(R.string.extensions_type_integration)
+    else -> category
+}
+
+/** How to find a registry URL; Go (resolveRegistryURL) accepts a GitHub repo or a direct registry.json link. */
+@Composable
+private fun RegistryGuide() {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerHigh),
+    ) {
+        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = stringResource(R.string.extensions_registry_guide_title),
+                style = MaterialTheme.typography.titleSmall,
+                fontFamily = GoogleSansRounded,
+            )
+            listOf(
+                R.string.extensions_registry_guide_1,
+                R.string.extensions_registry_guide_2,
+                R.string.extensions_registry_guide_3,
+                R.string.extensions_registry_guide_4,
+            ).forEachIndexed { i, res ->
+                Text(
+                    text = "${i + 1}. ${stringResource(res)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = GoogleSansRounded,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+            Text(
+                text = stringResource(R.string.extensions_registry_compatible),
+                style = MaterialTheme.typography.bodySmall,
+                fontFamily = GoogleSansRounded,
+            )
+            val uriHandler = LocalUriHandler.current
+            TextButton(onClick = { runCatching { uriHandler.openUri(COMPATIBLE_EXTENSIONS_URL) } }) {
+                Text(COMPATIBLE_EXTENSIONS_URL, fontFamily = GoogleSansRounded)
+            }
+        }
+    }
+}
+
+private const val COMPATIBLE_EXTENSIONS_URL = "https://spotiflac.com/extension"
 
 @Composable
 private fun TabPlaceholder(
@@ -379,7 +435,10 @@ private fun RepoExtensionRow(
                     overflow = TextOverflow.Ellipsis,
                 )
                 Text(
-                    text = "v${extension.version} · ${extension.category}",
+                    text = listOfNotNull(
+                        extension.version.takeIf { it.isNotEmpty() }?.let { "v$it" },
+                        categoryLabel(extension.category),
+                    ).joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,
                     fontFamily = GoogleSansRounded,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -443,12 +502,35 @@ private fun ExtensionRow(
                         else -> R.string.extensions_status_disabled
                     },
                 )
+                // Same "v<version> · <category>" line and description as the repository rows.
+                val category = extension.types.mapNotNull { type ->
+                    when (type) {
+                        "metadata_provider" -> R.string.extensions_type_metadata
+                        "download_provider" -> R.string.extensions_type_download
+                        "lyrics_provider" -> R.string.extensions_type_lyrics
+                        else -> null
+                    }
+                }.map { stringResource(it) }.joinToString(", ")
                 Text(
-                    text = if (extension.version.isEmpty()) statusLabel else "${extension.version} · $statusLabel",
+                    text = listOfNotNull(
+                        extension.version.takeIf { it.isNotEmpty() }?.let { "v$it" },
+                        category.takeIf { it.isNotEmpty() },
+                        statusLabel,
+                    ).joinToString(" · "),
                     style = MaterialTheme.typography.bodySmall,
                     fontFamily = GoogleSansRounded,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+                if (!extension.description.isNullOrEmpty()) {
+                    Text(
+                        text = extension.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = GoogleSansRounded,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
                 extension.error?.let { error ->
                     Text(
                         text = error,
