@@ -54,7 +54,9 @@ class GobackendDownloadBackend @Inject constructor(
             runCatching {
                 gobackend.Gobackend.initExtensionSystem(extDir.absolutePath, dataDir.absolutePath)
                 gobackend.Gobackend.loadExtensionsFromDir(extDir.absolutePath)
-            }.onSuccess { initialized = true }
+            }
+                .onSuccess { initialized = true }
+                .onFailure { Log.e(TAG, "initExtensionSystem($extDir, $dataDir) failed", it) }
             // Best-effort repo init: offline/failure must NOT flip initialized
             // back to false, the core extension system still works without it.
             runCatching {
@@ -66,12 +68,19 @@ class GobackendDownloadBackend @Inject constructor(
 
     override fun listInstalled(): List<InstalledExtension> {
         initIfNeeded()
+        if (!initialized) return emptyList()
         val raw = gobackend.Gobackend.getInstalledExtensions()
         return DownloadJson.decodeFromString(raw.ifEmpty { "[]" })
     }
 
     override fun installFromFile(path: String): BackendResult<InstalledExtension?> {
         initIfNeeded()
+        if (!initialized) {
+            Log.e(TAG, "installFromFile($path): extension system not initialized")
+            return BackendResult.Failed(
+                DownloadResponse(success = false, error = "extension system failed to initialize", errorType = "install_failed"),
+            )
+        }
         return runCatching {
             val raw = gobackend.Gobackend.loadExtensionFromPath(path)
             val id = DownloadJson.decodeFromString<InstallResult>(raw.ifEmpty { "{}" })
