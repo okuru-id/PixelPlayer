@@ -1,6 +1,7 @@
 package com.theveloper.pixelplay.data.database
 
 import androidx.paging.PagingSource
+import androidx.room.ColumnInfo
 import androidx.room.Dao
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
@@ -275,6 +276,10 @@ interface MusicDao {
 
     @Query("SELECT id FROM songs WHERE source_type = 7")
     suspend fun getAllS3SongIds(): List<Long>
+
+    /** Title/artist/duration of on-device songs, used to hide cloud copies of the same track. */
+    @Query("SELECT title, artist_name, duration FROM songs WHERE source_type = 0")
+    suspend fun getLocalSongMatchKeys(): List<SongMatchKey>
 
     @Transaction
     suspend fun deleteSongsAndRelatedData(songIds: List<Long>) {
@@ -1960,3 +1965,9 @@ interface MusicDao {
         const val SONG_BATCH_SIZE = 500
     }
 }
+
+data class SongMatchKey(
+    @ColumnInfo(name = "title") val title: String,
+    @ColumnInfo(name = "artist_name") val artistName: String,
+    @ColumnInfo(name = "duration") val duration: Long,
+)
