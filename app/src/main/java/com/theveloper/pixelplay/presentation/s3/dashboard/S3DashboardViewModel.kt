@@ -4,8 +4,10 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.theveloper.pixelplay.data.database.S3FolderEntity
 import com.theveloper.pixelplay.data.s3.S3Repository
+import com.theveloper.pixelplay.di.AppScope
 import dagger.hilt.android.lifecycle.HiltViewModel
 import javax.inject.Inject
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -15,7 +17,9 @@ import kotlinx.coroutines.launch
 
 @HiltViewModel
 class S3DashboardViewModel @Inject constructor(
-    private val repository: S3Repository
+    private val repository: S3Repository,
+    // Sync must outlive this screen: leaving the dashboard must not cancel it.
+    @AppScope private val appScope: CoroutineScope,
 ) : ViewModel() {
 
     val folders: StateFlow<List<S3FolderEntity>> = repository.getFolders()
@@ -40,7 +44,7 @@ class S3DashboardViewModel @Inject constructor(
 
     fun syncAllFoldersAndSongs() {
         if (_isSyncing.value) return
-        viewModelScope.launch {
+        appScope.launch {
             _isSyncing.value = true
             _syncMessage.value = "Syncing all folders..."
             val result = repository.syncAllFoldersAndSongs()
@@ -56,7 +60,7 @@ class S3DashboardViewModel @Inject constructor(
 
     fun syncFolder(folderId: String) {
         if (_isSyncing.value) return
-        viewModelScope.launch {
+        appScope.launch {
             _isSyncing.value = true
             _syncMessage.value = "Syncing folder..."
             repository.syncFolder(folderId).fold(
