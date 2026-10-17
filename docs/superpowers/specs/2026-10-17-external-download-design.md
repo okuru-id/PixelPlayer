@@ -18,7 +18,12 @@ reimplementing provider resolution, download pipeline, and tagging.
 
 - No new Go code; the AAR is consumed as-is from SpotiFLAC-Mobile.
 - No streaming from external providers — download only.
-- No extension marketplace beyond a repository URL / local file install.
+- No extension marketplace beyond local `.spotiflac-ext` file install
+  (system file picker). Repository-URL browsing/install is deferred to a
+  later slice — gobackend already ships the repo exports
+  (`InitExtensionRepoJSON`, `SetRepoRegistryURLJSON`, `GetRepoExtensionsJSON`,
+  `SearchRepoExtensionsJSON`, `DownloadRepoExtensionJSON` in
+  `exports_repo.go`), so adding it later is additive.
 - No download from PixelPlayer's own sources (S3, Telegram, etc.) — that is a
   separate, later feature.
 
@@ -51,20 +56,25 @@ All calls are JSON-string based (gomobile bindings):
 | `GetInstalledExtensions()` | list for Extensions screen |
 | `RemoveExtensionByID(id)` / `SetExtensionEnabledByID(id, enabled)` | management |
 | `SearchTracksWithMetadataProvidersJSON(query, limit, includeExtensions)` | cross-provider search |
-| `DownloadByStrategy(requestJSON)` | download, writes to caller-provided `OutputFD` |
+| `DownloadByStrategy(requestJSON)` | download, writes to caller-provided `OutputFD`; tagging is done by this call: request includes `"embed_metadata": true` plus title/artist/album/cover fields, pipeline embeds them (`extension_fallback_output.go`) |
 | `GetAllDownloadProgressDelta(seq)` / `WaitForAllDownloadProgressDelta(seq, timeoutMs)` | progress polling |
 | `CancelDownload(itemID)` | cancel |
-| `runPostProcessingV2JSON(inputObj, metadata)` | embed tags + cover into output file |
 | `GetExtensionPendingAuthJSON(extId)` / `SetExtensionAuthCodeByID(extId, code)` | extension auth flows |
+
+Note: `RunPostProcessingV2JSON` exists but only runs extension-declared
+post-process hooks (returns `NewFilePath`); it does NOT write tags and is not
+needed for the basic flow. Metadata embedding happens inside the download
+pipeline via the `embed_metadata` request field (same as the SpotiFLAC app,
+see its `lib/services/download_request_payload.dart`).
 
 `.spotiflac-ext` = ZIP with a JSON manifest; gobackend handles validation,
 staging, version compare (refuses downgrade), and per-extension data dirs.
 
 ## Data Flow
 
-1. App start (or first Download screen open): `InitExtensionSystem` with
-   `filesDir/extensions` and `filesDir/download_data`; then
-   `LoadExtensionsFromDir`.
+1. Lazy init, guarded by a mutex, on first open of the Download or
+   Extensions screen: `InitExtensionSystem` with `filesDir/extensions` and
+   `filesDir/download_data`; then `LoadExtensionsFromDir`.
 2. Download screen: `SearchTracksWithMetadataProvidersJSON(query, limit, true)`
    → list of tracks with provider, quality options.
 3. User taps download, optionally picks quality (default FLAC):
@@ -73,7 +83,9 @@ staging, version compare (refuses downgrade), and per-extension data dirs.
    `ParcelFileDescriptor`, call `DownloadByStrategy` with `OutputFD`.
 5. Poll progress deltas (~500 ms) → update notification and UI state
    (`DownloadRepository` exposes `StateFlow<List<DownloadJobState>>`).
-6. On success: `runPostProcessingV2JSON` writes title/artist/album/cover tags.
+6. On success the output file already carries embedded tags: the download
+   request set `"embed_metadata": true` with title/artist/album/cover
+   fields. (No separate tagging step.)
 7. SAF publish: resolve user's chosen tree URI via `DocumentFile`, copy
    staging → final name (`Artist - Title.flac`), delete staging. Name
    collisions get ` (1)` suffixes (DocumentFile `createFile` semantics).
@@ -123,3 +135,22 @@ staging, version compare (refuses downgrade), and per-extension data dirs.
 
 - AAR build + `DownloadBackend` + repository + worker: ~2 sessions
 - UI (search, extensions, settings, notifications): ~2 sessions
+
+## AAR Provenance
+
+- Built from SpotiFLAC-Mobile at a pinned commit (record the SHA in the
+  build script when the AAR is first produced).
+- Command (needs `ANDROID_NDK_HOME`, `CGO_ENABLED=1`):
+
+  ```bash
+  cd go_backend && go mod download
+  go install golang.org/x/mobile/cmd/gomobile && gomobile init
+  gomobile bind -target=android/arm64 -androidapi 24 -o ../app/libs/gobackend.aar .
+  ```
+
+  (Upstream CI also binds `android/arm`; we ship arm64 only — release
+  devices are arm64. Known limitation: x86_64 emulators cannot run the
+  download feature.)
+- Rebuild the AAR only when we deliberately upgrade the pinned SpotiFLAC
+  commit; the AAR is committed to `app/libs/` so app builds stay
+  Go-toolchain-free.
