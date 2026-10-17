@@ -253,4 +253,15 @@
     <string name="download_auth_code_label">Kode verifikasi</string>
     <string name="download_auth_submit">Kirim</string>
     <string name="download_auth_cancel">Batal</string>
+
+    <!-- Download extensions -->
+    <string name="extensions_title">Ekstensi</string>
+    <string name="extensions_install">Instal dari file</string>
+    <string name="extensions_cd_remove">Hapus ekstensi</string>
+    <string name="extensions_disclaimer">Ekstensi berisi kode pihak ketiga yang berjalan di perangkat Anda. Hanya instal ekstensi yang Anda percaya.</string>
+    <string name="extensions_empty">Instal ekstensi untuk mengaktifkan unduhan.</string>
+    <string name="extensions_install_failed">Tidak dapat menginstal ekstensi</string>
+    <string name="extensions_status_enabled">Aktif</string>
+    <string name="extensions_status_disabled">Nonaktif</string>
+    <string name="extensions_status_error">Gagal</string>
 </resources>

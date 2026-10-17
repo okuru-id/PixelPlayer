@@ -288,4 +288,15 @@
     <string name="download_auth_code_label">Verification code</string>
     <string name="download_auth_submit">Submit</string>
     <string name="download_auth_cancel">Cancel</string>
+
+    <!-- Download extensions -->
+    <string name="extensions_title">Extensions</string>
+    <string name="extensions_install">Install from file</string>
+    <string name="extensions_cd_remove">Remove extension</string>
+    <string name="extensions_disclaimer">Extensions contain third-party code that runs on your device. Only install extensions you trust.</string>
+    <string name="extensions_empty">Install an extension to enable downloads.</string>
+    <string name="extensions_install_failed">Couldn\'t install extension</string>
+    <string name="extensions_status_enabled">Enabled</string>
+    <string name="extensions_status_disabled">Disabled</string>
+    <string name="extensions_status_error">Error</string>
 </resources>
