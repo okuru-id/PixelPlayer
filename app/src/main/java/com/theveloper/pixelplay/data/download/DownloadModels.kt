@@ -118,4 +118,24 @@ data class InstalledExtension(
     val version: String get() = manifest.version
 }
 
+/**
+ * Entry from the extension registry. The Go repoExtension struct emits BOTH
+ * snake_case and camelCase keys (alt fields), so ignoreUnknownKeys +
+ * snake_case SerialNames is the correct pairing. Defaults everywhere so a
+ * partial registry entry never breaks parsing.
+ */
+@Serializable
+data class RepoExtension(
+    val id: String = "",
+    val name: String = "",
+    @SerialName("display_name") val displayName: String = "",
+    val version: String = "",
+    val description: String? = null,
+    @SerialName("download_url") val downloadUrl: String = "",
+    @SerialName("icon_url") val iconUrl: String? = null,
+    val category: String = "",
+    val sha256: String = "",
+    @SerialName("min_app_version") val minAppVersion: String = "",
+)
+
 val DownloadJson: Json = Json { ignoreUnknownKeys = true; encodeDefaults = true }

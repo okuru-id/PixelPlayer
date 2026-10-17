@@ -8,6 +8,7 @@ import com.theveloper.pixelplay.R
 import com.theveloper.pixelplay.data.download.BackendResult
 import com.theveloper.pixelplay.data.download.DownloadBackendApi
 import com.theveloper.pixelplay.data.download.InstalledExtension
+import com.theveloper.pixelplay.data.download.RepoExtension
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -27,6 +28,9 @@ class ExtensionsViewModel @Inject constructor(
 
     data class UiState(
         val extensions: List<InstalledExtension> = emptyList(),
+        val repoBrowse: List<RepoExtension> = emptyList(),
+        val repoLoading: Boolean = false,
+        val repoError: String? = null,
         val installing: Boolean = false,
         val error: String? = null,
     )
@@ -82,6 +86,33 @@ class ExtensionsViewModel @Inject constructor(
         runCatching { backend.setEnabled(id, enabled) }
             .onFailure { t -> _ui.update { it.copy(error = t.message ?: context.getString(R.string.extensions_install_failed)) } }
         load()
+    }
+
+    fun browseRepo(forceRefresh: Boolean = false) = viewModelScope.launch(Dispatchers.IO) {
+        _ui.update { it.copy(repoLoading = true, repoError = null) }
+        val items = runCatching { backend.listRepoExtensions(forceRefresh) }.getOrDefault(emptyList())
+        _ui.update {
+            // Empty can only mean failure here: the registry is never empty.
+            it.copy(
+                repoBrowse = items,
+                repoLoading = false,
+                repoError = if (items.isEmpty()) context.getString(R.string.extensions_repo_error) else null,
+            )
+        }
+    }
+
+    fun installFromRepo(id: String) = viewModelScope.launch(Dispatchers.IO) {
+        _ui.update { it.copy(installing = true) }
+        when (val result = backend.installFromRepo(id)) {
+            is BackendResult.Failed -> _ui.update {
+                it.copy(error = result.response.error ?: context.getString(R.string.extensions_install_failed))
+            }
+            is BackendResult.Ok -> {
+                load()
+                browseRepo()
+            }
+        }
+        _ui.update { it.copy(installing = false) }
     }
 
     fun consumeError() = _ui.update { it.copy(error = null) }

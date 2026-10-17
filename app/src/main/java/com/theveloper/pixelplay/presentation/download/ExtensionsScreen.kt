@@ -21,6 +21,7 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
@@ -36,10 +37,14 @@ import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -48,6 +53,7 @@ import androidx.hilt.lifecycle.viewmodel.compose.hiltViewModel
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.theveloper.pixelplay.R
 import com.theveloper.pixelplay.data.download.InstalledExtension
+import com.theveloper.pixelplay.data.download.RepoExtension
 import com.theveloper.pixelplay.ui.theme.GoogleSansRounded
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -58,6 +64,12 @@ fun ExtensionsScreen(
 ) {
     val ui by viewModel.ui.collectAsStateWithLifecycle()
     val snackbarHostState = remember { SnackbarHostState() }
+    var selectedTab by rememberSaveable { mutableIntStateOf(0) }
+
+    // Refresh the (cached) registry listing every time the repo tab opens.
+    LaunchedEffect(selectedTab) {
+        if (selectedTab == 1) viewModel.browseRepo()
+    }
 
     val filePicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         uri?.let(viewModel::install)
@@ -116,7 +128,48 @@ fun ExtensionsScreen(
                         .padding(vertical = 8.dp),
                 )
             }
-            if (ui.extensions.isEmpty()) {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = selectedTab == 0,
+                    onClick = { selectedTab = 0 },
+                    label = { Text(stringResource(R.string.extensions_tab_installed), fontFamily = GoogleSansRounded) },
+                )
+                FilterChip(
+                    selected = selectedTab == 1,
+                    onClick = { selectedTab = 1 },
+                    label = { Text(stringResource(R.string.extensions_tab_repo), fontFamily = GoogleSansRounded) },
+                )
+            }
+            if (selectedTab == 1) {
+                val repoError = ui.repoError
+                when {
+                    ui.repoLoading -> TabPlaceholder(
+                        stringResource(R.string.extensions_repo_loading),
+                        modifier = Modifier.weight(1f),
+                    )
+                    repoError != null -> TabPlaceholder(
+                        repoError,
+                        modifier = Modifier.weight(1f),
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                    else -> LazyColumn(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .weight(1f),
+                        contentPadding = PaddingValues(vertical = 8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) {
+                        items(ui.repoBrowse, key = { it.id }) { repoExtension ->
+                            RepoExtensionRow(
+                                extension = repoExtension,
+                                installedVersion = ui.extensions.firstOrNull { it.id == repoExtension.id }?.version,
+                                installing = ui.installing,
+                                onInstall = { viewModel.installFromRepo(repoExtension.id) },
+                            )
+                        }
+                    }
+                }
+            } else if (ui.extensions.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -157,6 +210,86 @@ fun ExtensionsScreen(
                             )
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TabPlaceholder(
+    text: String,
+    modifier: Modifier = Modifier,
+    color: Color = MaterialTheme.colorScheme.onSurfaceVariant,
+) {
+    Box(
+        modifier = modifier
+            .fillMaxWidth(),
+        contentAlignment = Alignment.Center,
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.bodyMedium,
+            fontFamily = GoogleSansRounded,
+            color = color,
+            textAlign = TextAlign.Center,
+        )
+    }
+}
+
+@Composable
+private fun RepoExtensionRow(
+    extension: RepoExtension,
+    installedVersion: String?,
+    installing: Boolean,
+    onInstall: () -> Unit,
+) {
+    Card(modifier = Modifier.fillMaxWidth()) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = extension.displayName.ifEmpty { extension.name.ifEmpty { extension.id } },
+                    style = MaterialTheme.typography.titleMedium,
+                    fontFamily = GoogleSansRounded,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                Text(
+                    text = "v${extension.version} · ${extension.category}",
+                    style = MaterialTheme.typography.bodySmall,
+                    fontFamily = GoogleSansRounded,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+                if (!extension.description.isNullOrEmpty()) {
+                    Text(
+                        text = extension.description,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontFamily = GoogleSansRounded,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+            if (installedVersion != null) {
+                Text(
+                    text = if (installedVersion.isEmpty()) {
+                        stringResource(R.string.extensions_install_done)
+                    } else {
+                        "v$installedVersion"
+                    },
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontFamily = GoogleSansRounded,
+                    color = MaterialTheme.colorScheme.primary,
+                )
+            } else {
+                TextButton(onClick = onInstall, enabled = !installing) {
+                    Text(stringResource(R.string.download_cd_download), fontFamily = GoogleSansRounded)
                 }
             }
         }

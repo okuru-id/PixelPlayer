@@ -8,6 +8,9 @@ import javax.inject.Singleton
 /** Search result bundle */
 data class SearchResult(val tracks: List<ExtTrack>)
 
+/** Curated extension registry consumed through the Go repo cache. */
+private const val REGISTRY_URL = "https://raw.githubusercontent.com/spotiflacapp/spotiflac-extension/main/registry.json"
+
 sealed interface BackendResult<out T> {
     data class Ok<T>(val value: T) : BackendResult<T>
     data class Failed(val response: DownloadResponse) : BackendResult<Nothing>
@@ -17,6 +20,8 @@ interface DownloadBackendApi {
     fun initIfNeeded()
     fun listInstalled(): List<InstalledExtension>
     fun installFromFile(path: String): BackendResult<InstalledExtension?>
+    fun listRepoExtensions(forceRefresh: Boolean): List<RepoExtension>
+    fun installFromRepo(id: String): BackendResult<InstalledExtension?>
     fun remove(id: String)
     fun setEnabled(id: String, enabled: Boolean)
     fun search(query: String, limit: Int = 30): List<ExtTrack>
@@ -39,13 +44,19 @@ class GobackendDownloadBackend @Inject constructor(
     override fun initIfNeeded() {
         synchronized(lock) {
             if (initialized) return
+            val extDir = File(settings.rootDir, "extensions")
+            val dataDir = File(settings.rootDir, "download_data")
+            extDir.mkdirs(); dataDir.mkdirs()
             runCatching {
-                val extDir = File(settings.rootDir, "extensions")
-                val dataDir = File(settings.rootDir, "download_data")
-                extDir.mkdirs(); dataDir.mkdirs()
                 gobackend.Gobackend.initExtensionSystem(extDir.absolutePath, dataDir.absolutePath)
                 gobackend.Gobackend.loadExtensionsFromDir(extDir.absolutePath)
             }.onSuccess { initialized = true }
+            // Best-effort repo init: offline/failure must NOT flip initialized
+            // back to false, the core extension system still works without it.
+            runCatching {
+                gobackend.Gobackend.initExtensionRepoJSON(dataDir.absolutePath)
+                gobackend.Gobackend.setRepoRegistryURLJSON(REGISTRY_URL)
+            }
         }
     }
 
@@ -66,6 +77,33 @@ class GobackendDownloadBackend @Inject constructor(
                 DownloadResponse(success = false, error = it.message, errorType = "install_failed"),
             )
         }
+    }
+
+    override fun listRepoExtensions(forceRefresh: Boolean): List<RepoExtension> {
+        initIfNeeded()
+        // getRepoExtensionsJSON returns a JSON string and may throw (gomobile
+        // String method); empty list on any failure.
+        return runCatching {
+            DownloadJson.decodeFromString<RepoExtensionsResponse>(
+                gobackend.Gobackend.getRepoExtensionsJSON(forceRefresh),
+            ).extensions.orEmpty()
+        }.getOrDefault(emptyList())
+    }
+
+    override fun installFromRepo(id: String): BackendResult<InstalledExtension?> {
+        initIfNeeded()
+        val dir = File(settings.rootDir, "repo_dl")
+        return runCatching {
+            dir.mkdirs()
+            // downloadRepoExtensionJSON verifies sha256 and returns the plain
+            // .sflx destPath, not JSON.
+            val destPath = gobackend.Gobackend.downloadRepoExtensionJSON(id, dir.absolutePath)
+            installFromFile(destPath)
+        }.getOrElse {
+            BackendResult.Failed(
+                DownloadResponse(success = false, error = it.message, errorType = "repo_download_failed"),
+            )
+        }.also { dir.deleteRecursively() }
     }
 
     override fun remove(id: String) { initIfNeeded(); gobackend.Gobackend.removeExtensionByID(id) }
@@ -116,3 +154,6 @@ class GobackendDownloadBackend @Inject constructor(
 
 @Serializable
 private data class InstallResult(val name: String = "", val success: Boolean = false, val error: String? = null)
+
+@Serializable
+private data class RepoExtensionsResponse(val extensions: List<RepoExtension>? = null)

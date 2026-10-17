@@ -300,4 +300,9 @@
     <string name="extensions_status_enabled">Enabled</string>
     <string name="extensions_status_disabled">Disabled</string>
     <string name="extensions_status_error">Error</string>
+    <string name="extensions_tab_installed">Installed</string>
+    <string name="extensions_tab_repo">Repository</string>
+    <string name="extensions_install_done">Installed</string>
+    <string name="extensions_repo_loading">Loading repository…</string>
+    <string name="extensions_repo_error">Failed to load repository</string>
 </resources>

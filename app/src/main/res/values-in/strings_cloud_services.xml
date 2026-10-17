@@ -265,4 +265,9 @@
     <string name="extensions_status_enabled">Aktif</string>
     <string name="extensions_status_disabled">Nonaktif</string>
     <string name="extensions_status_error">Gagal</string>
+    <string name="extensions_tab_installed">Terpasang</string>
+    <string name="extensions_tab_repo">Repositori</string>
+    <string name="extensions_install_done">Terpasang</string>
+    <string name="extensions_repo_loading">Memuat repositori…</string>
+    <string name="extensions_repo_error">Gagal memuat repositori</string>
 </resources>
