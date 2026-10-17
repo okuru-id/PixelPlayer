@@ -330,10 +330,6 @@
     <string name="download_error_open_file">Kunne ikke åpne målfilen</string>
     <string name="download_error_publish">Kunne ikke lagre filen</string>
     <string name="extensions_registry_compatible">Kompatible utvidelser er SpotiFLAC-utvidelsene som er oppført på:</string>
-    <string name="download_filter_songs">Sanger</string>
-    <string name="download_filter_albums">Album</string>
-    <string name="download_filter_artists">Artister</string>
-    <string name="download_filter_playlists">Spillelister</string>
     <string name="download_type_album">Album</string>
     <string name="download_type_artist">Artist</string>
     <string name="download_type_playlist">Spilleliste</string>

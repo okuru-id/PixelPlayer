@@ -330,10 +330,6 @@
     <string name="download_error_open_file">Hedef dosya açılamadı</string>
     <string name="download_error_publish">Dosya kaydedilemedi</string>
     <string name="extensions_registry_compatible">Uyumlu uzantılar, şu adreste listelenen SpotiFLAC uzantılarıdır:</string>
-    <string name="download_filter_songs">Şarkılar</string>
-    <string name="download_filter_albums">Albümler</string>
-    <string name="download_filter_artists">Sanatçılar</string>
-    <string name="download_filter_playlists">Çalma listeleri</string>
     <string name="download_type_album">Albüm</string>
     <string name="download_type_artist">Sanatçı</string>
     <string name="download_type_playlist">Çalma listesi</string>

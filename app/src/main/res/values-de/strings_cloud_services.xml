@@ -330,10 +330,6 @@
     <string name="download_error_open_file">Zieldatei konnte nicht geöffnet werden</string>
     <string name="download_error_publish">Datei konnte nicht gespeichert werden</string>
     <string name="extensions_registry_compatible">Kompatibel sind die SpotiFLAC-Erweiterungen, die hier aufgelistet sind:</string>
-    <string name="download_filter_songs">Songs</string>
-    <string name="download_filter_albums">Alben</string>
-    <string name="download_filter_artists">Künstler</string>
-    <string name="download_filter_playlists">Playlists</string>
     <string name="download_type_album">Album</string>
     <string name="download_type_artist">Künstler</string>
     <string name="download_type_playlist">Playlist</string>
