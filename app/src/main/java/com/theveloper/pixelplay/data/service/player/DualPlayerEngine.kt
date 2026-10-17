@@ -1200,7 +1200,7 @@ class DualPlayerEngine @Inject constructor(
         val uriString = uri.toString()
         resolvedUriCache.get(uriString)?.let { return@withContext it }
 
-        val resolved: Uri? = when (uri.scheme) {
+        suspend fun tryResolve(): Uri? = when (uri.scheme) {
             "telegram" -> resolveTelegramUriAsync(uri, uriString)
             "netease" -> resolveNeteaseUriAsync(uriString)
             "qqmusic" -> resolveQqMusicUriAsync(uriString)
@@ -1209,6 +1209,15 @@ class DualPlayerEngine @Inject constructor(
             "gdrive" -> resolveGDriveUriAsync(uriString)
             "s3" -> resolveS3UriAsync(uriString)
             else -> null
+        }
+
+        var resolved = tryResolve()
+        if (resolved == null) {
+            // Transient failures (proxy warm-up race, network blip) resolve on retry;
+            // a raw cloud URI would hit ExoPlayer as "unknown protocol" and error out.
+            Timber.tag("DualPlayerEngine").w("Cloud resolve failed for %s — retrying once", uri.scheme)
+            delay(400)
+            resolved = tryResolve()
         }
 
         if (resolved != null) {
@@ -1275,11 +1284,17 @@ class DualPlayerEngine @Inject constructor(
 
     private suspend fun resolveS3UriAsync(uriString: String): Uri? = withContext(Dispatchers.IO) {
         if (!connectivityStateHolder.isOnline.value) {
+            Timber.tag("DualPlayerEngine").w("S3 resolve blocked: offline")
             connectivityStateHolder.triggerOfflineBlockedEvent()
             return@withContext null
         }
-        if (!s3StreamProxy.ensureReady(5_000L)) return@withContext null
-        s3StreamProxy.resolveS3Uri(uriString)?.toUri()
+        if (!s3StreamProxy.ensureReady(5_000L)) {
+            Timber.tag("DualPlayerEngine").w("S3 resolve failed: proxy not ready within 5s")
+            return@withContext null
+        }
+        s3StreamProxy.resolveS3Uri(uriString)?.toUri().also {
+            if (it == null) Timber.tag("DualPlayerEngine").w("S3 resolve returned null for %s", uriString)
+        }
     }
 
     suspend fun resolveMediaItem(mediaItem: MediaItem): MediaItem {
