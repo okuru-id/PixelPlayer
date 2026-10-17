@@ -84,9 +84,10 @@ class GobackendDownloadBackend @Inject constructor(
         // getRepoExtensionsJSON returns a JSON string and may throw (gomobile
         // String method); empty list on any failure.
         return runCatching {
-            DownloadJson.decodeFromString<RepoExtensionsResponse>(
+            // GetRepoExtensionsJSON marshals the extensions array directly.
+            DownloadJson.decodeFromString<List<RepoExtension>>(
                 gobackend.Gobackend.getRepoExtensionsJSON(forceRefresh),
-            ).extensions.orEmpty()
+            )
         }.getOrDefault(emptyList())
     }
 
@@ -165,4 +166,3 @@ class GobackendDownloadBackend @Inject constructor(
 private data class InstallResult(val name: String = "", val success: Boolean = false, val error: String? = null)
 
 @Serializable
-private data class RepoExtensionsResponse(val extensions: List<RepoExtension>? = null)
