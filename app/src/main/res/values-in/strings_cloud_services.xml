@@ -230,6 +230,7 @@
 
     <!-- External download -->
     <string name="download_title">Unduhan</string>
+    <string name="download_entry_subtitle">Cari dan unduh dari penyedia eksternal</string>
     <string name="download_search_hint">Cari lagu…</string>
     <string name="download_cd_search">Cari</string>
     <string name="download_cd_download">Unduh</string>

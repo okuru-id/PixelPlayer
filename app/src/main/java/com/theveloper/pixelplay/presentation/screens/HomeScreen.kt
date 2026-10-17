@@ -576,6 +576,9 @@ fun HomeScreen(
             isS3LoggedIn = isS3LoggedIn,
             onNavigateToS3Dashboard = {
                 navController.navigateSafely(Screen.S3Dashboard.route)
+            },
+            onOpenDownload = {
+                navController.navigateSafely(Screen.Download.route)
             }
         )
     }

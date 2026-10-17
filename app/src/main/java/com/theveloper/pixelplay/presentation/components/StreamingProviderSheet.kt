@@ -9,6 +9,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForwardIos
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.rounded.Download
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
@@ -17,6 +18,7 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.painter.Painter
+import androidx.compose.ui.graphics.vector.rememberVectorPainter
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -52,6 +54,7 @@ fun StreamingProviderSheet(
     onNavigateToJellyfinDashboard: () -> Unit = {},
     isS3LoggedIn: Boolean = false,
     onNavigateToS3Dashboard: () -> Unit = {},
+    onOpenDownload: () -> Unit = {},
     sheetState: SheetState = rememberModalBottomSheetState(
         skipPartiallyExpanded = true
     )
@@ -107,6 +110,18 @@ fun StreamingProviderSheet(
                         .clip(providerSegmentContainerShape),
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
+                    ProviderRow(
+                        iconPainter = rememberVectorPainter(Icons.Rounded.Download),
+                        iconTint = MaterialTheme.colorScheme.primary,
+                        title = stringResource(R.string.download_title),
+                        subtitle = stringResource(R.string.download_entry_subtitle),
+                        shape = providerSegmentItemShape,
+                        onClick = {
+                            onOpenDownload()
+                            onDismissRequest()
+                        }
+                    )
+
                     ProviderRow(
                         iconPainter = painterResource(R.drawable.telegram),
                         iconTint = Color(0xFF2AABEE),

@@ -516,6 +516,25 @@ fun AppNavigation(
                     )
                 }
             }
+            composable(
+                Screen.Download.route,
+            ) {
+                ScreenWrapper(navController = navController, playerViewModel = playerViewModel, animatedVisibilityScope = this) {
+                    com.theveloper.pixelplay.presentation.download.DownloadScreen(
+                        onNavigateBack = { navController.popBackStack() },
+                        onOpenExtensions = { navController.navigateSafely(Screen.Extensions.route) }
+                    )
+                }
+            }
+            composable(
+                Screen.Extensions.route,
+            ) {
+                ScreenWrapper(navController = navController, playerViewModel = playerViewModel, animatedVisibilityScope = this) {
+                    com.theveloper.pixelplay.presentation.download.ExtensionsScreen(
+                        onNavigateBack = { navController.popBackStack() }
+                    )
+                }
+            }
         }
     }
 }

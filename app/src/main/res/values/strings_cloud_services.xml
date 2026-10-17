@@ -265,6 +265,7 @@
 
     <!-- External download -->
     <string name="download_title">Downloads</string>
+    <string name="download_entry_subtitle">Search and download from external providers</string>
     <string name="download_search_hint">Search tracks…</string>
     <string name="download_cd_search">Search</string>
     <string name="download_cd_download">Download</string>
