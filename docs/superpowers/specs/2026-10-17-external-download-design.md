@@ -57,7 +57,9 @@ All calls are JSON-string based (gomobile bindings):
 | `GetInstalledExtensions()` | list for Extensions screen |
 | `RemoveExtensionByID(id)` / `SetExtensionEnabledByID(id, enabled)` | management |
 | `SearchTracksWithMetadataProvidersJSON(query, limit, includeExtensions)` | cross-provider search |
-| `DownloadByStrategy(requestJSON)` | download; request must set `use_extensions: true` (else hard error: built-in providers are retired), `item_id` (keys progress + cancel), `service` (provider id), `quality`; optional `output_ext`, `filename_format`; and `"embed_metadata": true` plus title/artist/album/cover fields — the pipeline embeds tags+cover into the staged FLAC file (`extension_fallback_output.go`). Pass a local `output_path` (cacheDir work file), NOT an `output_fd`: the extension pipeline stages and embeds in its own work file and returns the path in the response (`resp.file_path`) |
+| `DownloadByStrategy(requestJSON)` | download; request must set `use_extensions: true` (else hard error: built-in providers are retired), `item_id` (keys progress + cancel), `service` (provider id), `quality`; optional `output_ext`, `filename_format`; and `"embed_metadata": true` plus title/artist/album/cover fields — the pipeline embeds tags+cover into the staged FLAC file (`extension_fallback_output.go`). Pass a local `output_path` (cacheDir work file), NOT an `output_fd`: with
+`output_path` set the pipeline writes and embeds into that exact file and
+returns the path in the response (`resp.file_path`) |
 | `GetAllDownloadProgressDelta(seq)` / `WaitForAllDownloadProgressDelta(seq, timeoutMs)` | progress polling |
 | `CancelDownload(itemID)` | cancel |
 | `GetExtensionPendingAuthJSON(extId)` / `SetExtensionAuthCodeByID(extId, code)` | extension auth flows |
@@ -93,9 +95,11 @@ staging, version compare (refuses downgrade), and per-extension data dirs.
    request set `"embed_metadata": true` with title/artist/album/cover
    fields. (No separate tagging step.)
 7. SAF publish: resolve user's chosen tree URI via `DocumentFile`, copy
-   `resp.file_path` (the finished, tagged file) → final name
-   (`Artist - Title.flac`), then delete the work file. Name
-   collisions get ` (1)` suffixes (DocumentFile `createFile` semantics).
+   `resp.file_path` (the finished, tagged file) → final name derived from
+   title/artist AND `resp.actual_extension` (a provider may return MP3
+   despite a FLAC request — never hardcode `.flac`), then delete the work
+   file. Name collisions get ` (1)` suffixes (DocumentFile `createFile`
+   semantics).
 8. Trigger local library scan so the new file appears under "Local".
 
 ## UI
@@ -147,8 +151,9 @@ staging, version compare (refuses downgrade), and per-extension data dirs.
 
 ## AAR Provenance
 
-- Built from SpotiFLAC-Mobile at a pinned commit (record the SHA in the
-  build script when the AAR is first produced).
+- Built from SpotiFLAC-Mobile at pinned commit:
+  `<FILL: record upstream SHA when the AAR is first built>`.
+- Built on: `<date>` · AAR committed at: `<our commit>`.
 - Command (needs `ANDROID_NDK_HOME`, `CGO_ENABLED=1`):
 
   ```bash
