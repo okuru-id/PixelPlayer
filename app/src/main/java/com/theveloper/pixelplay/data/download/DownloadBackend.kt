@@ -52,6 +52,7 @@ class GobackendDownloadBackend @Inject constructor(
             val dataDir = File(settings.rootDir, "download_data")
             extDir.mkdirs(); dataDir.mkdirs()
             runCatching {
+                gobackend.Gobackend.setExtensionStorageMasterKey(settings.extensionMasterKey)
                 gobackend.Gobackend.initExtensionSystem(extDir.absolutePath, dataDir.absolutePath)
                 gobackend.Gobackend.loadExtensionsFromDir(extDir.absolutePath)
             }
