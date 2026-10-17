@@ -270,4 +270,9 @@
     <string name="extensions_install_done">Terpasang</string>
     <string name="extensions_repo_loading">Memuat repositori…</string>
     <string name="extensions_repo_error">Gagal memuat repositori</string>
+    <string name="extensions_registry_hint">Masukkan URL registry ekstensi untuk melihat daftar</string>
+    <string name="extensions_registry_label">URL Registry</string>
+    <string name="extensions_registry_placeholder">https://example.com/registry.json</string>
+    <string name="extensions_registry_load">Muat</string>
+    <string name="extensions_registry_edit">Ganti URL registry</string>
 </resources>

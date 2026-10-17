@@ -305,4 +305,9 @@
     <string name="extensions_install_done">Installed</string>
     <string name="extensions_repo_loading">Loading repository…</string>
     <string name="extensions_repo_error">Failed to load repository</string>
+    <string name="extensions_registry_hint">Enter the extension registry URL to browse</string>
+    <string name="extensions_registry_label">Registry URL</string>
+    <string name="extensions_registry_placeholder">https://example.com/registry.json</string>
+    <string name="extensions_registry_load">Load</string>
+    <string name="extensions_registry_edit">Change registry URL</string>
 </resources>

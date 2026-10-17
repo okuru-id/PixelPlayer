@@ -19,6 +19,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.rounded.Add
+import androidx.compose.material.icons.rounded.Edit
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -27,6 +28,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -38,6 +40,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -142,7 +145,16 @@ fun ExtensionsScreen(
             }
             if (selectedTab == 1) {
                 val repoError = ui.repoError
+                val registryError = ui.registryError
                 when {
+                    ui.registryEditing || ui.registryUrl == null -> RegistryUrlInput(
+                        initialUrl = ui.registryUrl.orEmpty(),
+                        error = registryError,
+                        enabled = !ui.repoLoading,
+                        onSubmit = viewModel::setRegistryUrl,
+                        onCancel = if (ui.registryUrl != null) ({ viewModel.consumeRegistryEdit() }) else null,
+                        modifier = Modifier.weight(1f),
+                    )
                     ui.repoLoading -> TabPlaceholder(
                         stringResource(R.string.extensions_repo_loading),
                         modifier = Modifier.weight(1f),
@@ -166,6 +178,24 @@ fun ExtensionsScreen(
                                 installing = ui.installing,
                                 onInstall = { viewModel.installFromRepo(repoExtension.id) },
                             )
+                        }
+                        item {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.Center,
+                                verticalAlignment = Alignment.CenterVertically,
+                            ) {
+                                Text(
+                                    text = ui.registryUrl.orEmpty(),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f, fill = false),
+                                )
+                                IconButton(onClick = viewModel::editRegistry) {
+                                    Icon(Icons.Rounded.Edit, contentDescription = stringResource(R.string.extensions_registry_edit))
+                                }
+                            }
                         }
                     }
                 }
@@ -211,6 +241,52 @@ fun ExtensionsScreen(
                         }
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun RegistryUrlInput(
+    initialUrl: String,
+    error: String?,
+    enabled: Boolean,
+    onSubmit: (String) -> Unit,
+    onCancel: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    var url by rememberSaveable(initialUrl) { mutableStateOf(initialUrl) }
+    Column(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = 16.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp, Alignment.CenterVertically),
+    ) {
+        Text(
+            text = stringResource(R.string.extensions_registry_hint),
+            style = MaterialTheme.typography.bodyMedium,
+            fontFamily = GoogleSansRounded,
+        )
+        OutlinedTextField(
+            value = url,
+            onValueChange = { url = it },
+            label = { Text(stringResource(R.string.extensions_registry_label)) },
+            placeholder = { Text(stringResource(R.string.extensions_registry_placeholder), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            isError = error != null,
+            supportingText = error?.let { { Text(it) } },
+            singleLine = true,
+            enabled = enabled,
+            modifier = Modifier.fillMaxWidth(),
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (onCancel != null) {
+                TextButton(onClick = onCancel, enabled = enabled) {
+                    Text(stringResource(android.R.string.cancel), fontFamily = GoogleSansRounded)
+                }
+            }
+            TextButton(onClick = { onSubmit(url) }, enabled = enabled && url.isNotBlank()) {
+                Text(stringResource(R.string.extensions_registry_load), fontFamily = GoogleSansRounded)
             }
         }
     }

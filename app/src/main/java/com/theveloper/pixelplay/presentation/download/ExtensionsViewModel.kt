@@ -9,6 +9,7 @@ import com.theveloper.pixelplay.data.download.BackendResult
 import com.theveloper.pixelplay.data.download.DownloadBackendApi
 import com.theveloper.pixelplay.data.download.InstalledExtension
 import com.theveloper.pixelplay.data.download.RepoExtension
+import com.theveloper.pixelplay.data.download.DownloadSettings
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import java.io.File
@@ -23,6 +24,7 @@ import kotlinx.coroutines.launch
 @HiltViewModel
 class ExtensionsViewModel @Inject constructor(
     private val backend: DownloadBackendApi,
+    private val settings: DownloadSettings,
     @ApplicationContext private val context: Context,
 ) : ViewModel() {
 
@@ -31,6 +33,9 @@ class ExtensionsViewModel @Inject constructor(
         val repoBrowse: List<RepoExtension> = emptyList(),
         val repoLoading: Boolean = false,
         val repoError: String? = null,
+        val registryUrl: String? = null,
+        val registryEditing: Boolean = false,
+        val registryError: String? = null,
         val installing: Boolean = false,
         val error: String? = null,
     )
@@ -89,7 +94,12 @@ class ExtensionsViewModel @Inject constructor(
     }
 
     fun browseRepo(forceRefresh: Boolean = false) = viewModelScope.launch(Dispatchers.IO) {
-        _ui.update { it.copy(repoLoading = true, repoError = null) }
+        val configured = settings.registryUrl
+        if (configured == null) {
+            _ui.update { it.copy(registryUrl = null, registryEditing = true, repoBrowse = emptyList(), repoLoading = false, repoError = null) }
+            return@launch
+        }
+        _ui.update { it.copy(registryUrl = configured, repoLoading = true, repoError = null) }
         val items = runCatching { backend.listRepoExtensions(forceRefresh) }.getOrDefault(emptyList())
         _ui.update {
             // Empty can only mean failure here: the registry is never empty.
@@ -114,6 +124,20 @@ class ExtensionsViewModel @Inject constructor(
         }
         _ui.update { it.copy(installing = false) }
     }
+
+    fun setRegistryUrl(url: String) = viewModelScope.launch(Dispatchers.IO) {
+        val err = backend.setRegistryUrl(url)
+        if (err == null) {
+            _ui.update { it.copy(registryEditing = false, registryUrl = url.trim()) }
+            browseRepo(forceRefresh = true)
+        } else {
+            _ui.update { it.copy(registryError = err) }
+        }
+    }
+
+    fun editRegistry() = _ui.update { it.copy(registryEditing = true) }
+
+    fun consumeRegistryEdit() = _ui.update { it.copy(registryEditing = false, registryError = null) }
 
     fun consumeError() = _ui.update { it.copy(error = null) }
 }

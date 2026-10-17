@@ -8,9 +8,6 @@ import javax.inject.Singleton
 /** Search result bundle */
 data class SearchResult(val tracks: List<ExtTrack>)
 
-/** Curated extension registry consumed through the Go repo cache. */
-private const val REGISTRY_URL = "https://raw.githubusercontent.com/spotiflacapp/spotiflac-extension/main/registry.json"
-
 sealed interface BackendResult<out T> {
     data class Ok<T>(val value: T) : BackendResult<T>
     data class Failed(val response: DownloadResponse) : BackendResult<Nothing>
@@ -22,6 +19,8 @@ interface DownloadBackendApi {
     fun installFromFile(path: String): BackendResult<InstalledExtension?>
     fun listRepoExtensions(forceRefresh: Boolean): List<RepoExtension>
     fun installFromRepo(id: String): BackendResult<InstalledExtension?>
+    /** Persists and applies a user-supplied registry URL. Returns null on success, error message on failure. */
+    fun setRegistryUrl(url: String): String?
     fun remove(id: String)
     fun setEnabled(id: String, enabled: Boolean)
     fun search(query: String, limit: Int = 30): List<ExtTrack>
@@ -55,7 +54,7 @@ class GobackendDownloadBackend @Inject constructor(
             // back to false, the core extension system still works without it.
             runCatching {
                 gobackend.Gobackend.initExtensionRepoJSON(dataDir.absolutePath)
-                gobackend.Gobackend.setRepoRegistryURLJSON(REGISTRY_URL)
+                settings.registryUrl?.let { gobackend.Gobackend.setRepoRegistryURLJSON(it) }
             }
         }
     }
@@ -80,6 +79,7 @@ class GobackendDownloadBackend @Inject constructor(
     }
 
     override fun listRepoExtensions(forceRefresh: Boolean): List<RepoExtension> {
+        if (settings.registryUrl == null) return emptyList() // no registry configured yet
         initIfNeeded()
         // getRepoExtensionsJSON returns a JSON string and may throw (gomobile
         // String method); empty list on any failure.
@@ -88,6 +88,15 @@ class GobackendDownloadBackend @Inject constructor(
                 gobackend.Gobackend.getRepoExtensionsJSON(forceRefresh),
             ).extensions.orEmpty()
         }.getOrDefault(emptyList())
+    }
+
+    override fun setRegistryUrl(url: String): String? {
+        initIfNeeded()
+        val applied = runCatching { gobackend.Gobackend.setRepoRegistryURLJSON(url.trim()) }
+        return applied.fold(
+            onSuccess = { settings.registryUrl = url.trim(); null },
+            onFailure = { it.message ?: "Invalid registry URL" },
+        )
     }
 
     override fun installFromRepo(id: String): BackendResult<InstalledExtension?> {
