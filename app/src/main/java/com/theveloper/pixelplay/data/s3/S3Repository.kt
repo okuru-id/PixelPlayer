@@ -305,7 +305,10 @@ class S3Repository @Inject constructor(
     suspend fun refreshUnifiedLibrary() = resyncUnifiedLibrary()
 
     private suspend fun resyncUnifiedLibrary() {
-        val s3Songs = dao.getAllS3SongsList()
+        // A track that is also on the device stays local-only: its S3 copy is left out of the
+        // library (and removed if it was mirrored before) until the local file goes away.
+        val localTracks = LocalTrackIndex(musicDao.getLocalSongMatchKeys())
+        val s3Songs = dao.getAllS3SongsList().filterNot { localTracks.hasLocalCopy(it.title, it.artist, it.duration) }
         val existingUnifiedIds = musicDao.getAllS3SongIds()
 
         if (s3Songs.isEmpty()) {

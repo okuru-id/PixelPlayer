@@ -30,6 +30,7 @@ import com.theveloper.pixelplay.data.diagnostics.AdvancedPerformanceDiagnostics
 import com.theveloper.pixelplay.data.diagnostics.PerformanceMetrics
 import com.theveloper.pixelplay.data.model.ArtistRef
 import com.theveloper.pixelplay.data.navidrome.NavidromeRepository
+import com.theveloper.pixelplay.data.s3.S3Repository
 import com.theveloper.pixelplay.data.media.AudioMetadataReader
 import com.theveloper.pixelplay.data.model.Song
 import com.theveloper.pixelplay.data.preferences.UserPreferencesRepository
@@ -77,7 +78,8 @@ constructor(
         private val lyricsRepository: LyricsRepository,
         private val telegramDao: TelegramDao,
         private val neteaseDao: NeteaseDao,
-        private val navidromeRepository: NavidromeRepository
+        private val navidromeRepository: NavidromeRepository,
+        private val s3Repository: S3Repository
 ) : CoroutineWorker(appContext, workerParams) {
 
     private val contentResolver: ContentResolver = appContext.contentResolver
@@ -462,6 +464,11 @@ constructor(
                         syncNavidromeData()
                     } else {
                         Log.d(TAG, "Skipping Navidrome sync — not logged in.")
+                    }
+
+                    // Local files may have changed: re-mirror S3 so copies of on-device tracks stay hidden.
+                    if (s3Repository.isLoggedInFlow.value) {
+                        s3Repository.refreshUnifiedLibrary()
                     }
 
                     // Recalculate total
