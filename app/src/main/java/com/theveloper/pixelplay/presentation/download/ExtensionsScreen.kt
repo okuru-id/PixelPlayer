@@ -125,7 +125,10 @@ fun ExtensionsScreen(
                 },
             )
         },
-        snackbarHost = { SnackbarHost(snackbarHostState) },
+        snackbarHost = {
+            // Lift above the main screen's bottom nav + mini player overlay.
+            SnackbarHost(snackbarHostState, modifier = Modifier.padding(bottom = MiniPlayerHeight + 24.dp))
+        },
     ) { paddingValues ->
         Column(
             modifier = Modifier
