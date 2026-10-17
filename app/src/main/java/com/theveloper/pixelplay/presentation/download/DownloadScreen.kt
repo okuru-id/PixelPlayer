@@ -17,6 +17,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Download
@@ -34,7 +36,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -147,14 +148,14 @@ fun DownloadScreen(
                 }
             }
 
-            OutlinedTextField(
+            SmoothOutlinedField(
                 value = ui.query,
                 onValueChange = viewModel::onQueryChange,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                placeholder = { Text(stringResource(R.string.download_search_hint), fontFamily = GoogleSansRounded) },
-                singleLine = true,
+                modifier = Modifier.padding(vertical = 4.dp),
+                placeholder = stringResource(R.string.download_search_hint),
+                enabled = !ui.searching,
+                keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                keyboardActions = KeyboardActions(onSearch = { viewModel.search(ui.query) }),
                 trailingIcon = {
                     if (ui.searching) {
                         CircularProgressIndicator(modifier = Modifier.size(20.dp), strokeWidth = 2.dp)
@@ -344,11 +345,11 @@ private fun AuthCodeDialog(prompt: String, onSubmit: (String) -> Unit, onDismiss
                     fontFamily = GoogleSansRounded,
                 )
                 Spacer(Modifier.height(12.dp))
-                OutlinedTextField(
+                SmoothOutlinedField(
                     value = code,
                     onValueChange = { code = it },
-                    label = { Text(stringResource(R.string.download_auth_code_label), fontFamily = GoogleSansRounded) },
-                    singleLine = true,
+                    label = stringResource(R.string.download_auth_code_label),
+                    isError = false,
                 )
             }
         },

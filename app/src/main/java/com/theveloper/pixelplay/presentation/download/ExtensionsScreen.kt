@@ -20,6 +20,8 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.rounded.Add
 import androidx.compose.material.icons.rounded.Edit
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
@@ -28,7 +30,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedCard
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
@@ -57,6 +58,8 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.theveloper.pixelplay.R
 import com.theveloper.pixelplay.data.download.InstalledExtension
 import com.theveloper.pixelplay.data.download.RepoExtension
+import androidx.compose.ui.text.input.ImeAction
+import androidx.compose.ui.text.input.KeyboardType
 import com.theveloper.pixelplay.ui.theme.GoogleSansRounded
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -268,16 +271,16 @@ private fun RegistryUrlInput(
             style = MaterialTheme.typography.bodyMedium,
             fontFamily = GoogleSansRounded,
         )
-        OutlinedTextField(
+        SmoothOutlinedField(
             value = url,
             onValueChange = { url = it },
-            label = { Text(stringResource(R.string.extensions_registry_label)) },
-            placeholder = { Text(stringResource(R.string.extensions_registry_placeholder), maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            label = stringResource(R.string.extensions_registry_label),
+            placeholder = stringResource(R.string.extensions_registry_placeholder),
+            supportingText = error,
             isError = error != null,
-            supportingText = error?.let { { Text(it) } },
-            singleLine = true,
             enabled = enabled,
-            modifier = Modifier.fillMaxWidth(),
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri, imeAction = ImeAction.Done),
+            keyboardActions = KeyboardActions(onDone = { onSubmit(url) }),
         )
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (onCancel != null) {
