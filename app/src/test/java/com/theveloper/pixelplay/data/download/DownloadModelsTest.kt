@@ -22,7 +22,7 @@ class DownloadModelsTest {
             artistName = "Artist",
             albumName = "Album",
             coverUrl = "https://example/cover.jpg",
-            outputPath = "/tmp/work.flac",
+            outputDir = "/tmp/work",
             quality = "flac",
             embedMetadata = true,
             itemId = "item-1",
@@ -38,7 +38,7 @@ class DownloadModelsTest {
         assertTrue(tree["use_extensions"]!!.jsonPrimitive.boolean)  // always true, spec-mandated
         assertEquals("item-1", tree["item_id"]!!.jsonPrimitive.content)
         assertEquals("flac", tree["quality"]!!.jsonPrimitive.content)
-        assertEquals("/tmp/work.flac", tree["output_path"]!!.jsonPrimitive.content)
+        assertEquals("/tmp/work", tree["output_dir"]!!.jsonPrimitive.content)
         assertFalse(tree.toString().contains("output_fd"))
     }
 
@@ -90,11 +90,16 @@ class DownloadModelsTest {
     @Test
     fun `installed extensions parse`() {
         val exts = json.decodeFromString<List<InstalledExtension>>(
-            """[{"id":"qobuz-ext","manifest":{"name":"qobuz","display_name":"Qobuz","version":"1.2.0"},
-                "enabled":true,"status":"ok"}]"""
+            // GetInstalledExtensions returns flat ExtensionInfo objects (no nested manifest).
+            """[{"id":"qobuz-ext","name":"qobuz","display_name":"Qobuz","version":"1.2.0",
+                "enabled":true,"status":"ok","types":["download_provider"],
+                "search_behavior":{"enabled":true,"filters":[{"id":"track"},{"id":"album"}]}}]"""
         )
         assertEquals("qobuz-ext", exts[0].id)
         assertEquals("Qobuz", exts[0].displayName)
         assertEquals("1.2.0", exts[0].version)
+        assertTrue(exts[0].isDownloadProvider)
+        assertTrue(exts[0].hasCustomSearch)
+        assertEquals(listOf("track", "album"), exts[0].searchBehavior!!.filters.map { it.id })
     }
 }

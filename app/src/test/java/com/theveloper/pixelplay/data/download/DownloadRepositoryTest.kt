@@ -12,7 +12,7 @@ class DownloadRepositoryTest {
     @Test
     fun `enqueue adds queued job`() = runTest {
         val r = repo()
-        r.enqueue(ExtTrack(id = "t1", name = "Song", artists = "A"), quality = "flac")
+        r.enqueue(ExtTrack(id = "t1", name = "Song", artists = "A"), quality = "flac", downloadProvider = "qobuz")
         val jobs = r.jobs.value
         assertEquals(1, jobs.size)
         assertEquals(JobStatus.QUEUED, jobs[0].status)
@@ -22,7 +22,7 @@ class DownloadRepositoryTest {
     @Test
     fun `applyDelta updates progress and completion`() = runTest {
         val r = repo()
-        r.enqueue(ExtTrack(id = "t1", name = "Song", artists = "A"), quality = "flac")
+        r.enqueue(ExtTrack(id = "t1", name = "Song", artists = "A"), quality = "flac", downloadProvider = "qobuz")
         val itemId = r.jobs.value[0].itemId
         r.applyDelta(
             ProgressDelta(seq = 1, items = mapOf(itemId to ItemProgress(itemId, bytesTotal = 100, bytesReceived = 40, progress = 0.4f, isDownloading = true, status = "downloading"))),
@@ -38,7 +38,7 @@ class DownloadRepositoryTest {
     @Test
     fun `applyDelta removes and marks failed`() = runTest {
         val r = repo()
-        r.enqueue(ExtTrack(id = "t1", name = "Song", artists = "A"), quality = "flac")
+        r.enqueue(ExtTrack(id = "t1", name = "Song", artists = "A"), quality = "flac", downloadProvider = "qobuz")
         val itemId = r.jobs.value[0].itemId
         r.markFailed(itemId, error = "boom", errorType = "http_403")
         assertEquals(JobStatus.FAILED, r.jobs.value[0].status)
@@ -52,8 +52,8 @@ class DownloadRepositoryTest {
     @Test
     fun `claimNextQueued returns oldest queued`() = runTest {
         val r = repo()
-        r.enqueue(ExtTrack(id = "t1", name = "S1", artists = "A"), quality = "flac")
-        r.enqueue(ExtTrack(id = "t2", name = "S2", artists = "A"), quality = "flac")
+        r.enqueue(ExtTrack(id = "t1", name = "S1", artists = "A"), quality = "flac", downloadProvider = "qobuz")
+        r.enqueue(ExtTrack(id = "t2", name = "S2", artists = "A"), quality = "flac", downloadProvider = "qobuz")
         assertEquals("S1", r.claimNextQueued()?.title)
         assertEquals("S2", r.claimNextQueued()?.title)
         assertNull(r.claimNextQueued())
@@ -62,7 +62,7 @@ class DownloadRepositoryTest {
     @Test
     fun `retry resets failed job`() = runTest {
         val r = repo()
-        r.enqueue(ExtTrack(id = "t1", name = "Song", artists = "A"), quality = "flac")
+        r.enqueue(ExtTrack(id = "t1", name = "Song", artists = "A"), quality = "flac", downloadProvider = "qobuz")
         val id = r.jobs.value[0].itemId
         r.markFailed(id, "err", "x")
         r.retry(id)
