@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 
@@ -38,8 +39,11 @@ class S3DashboardViewModel @Inject constructor(
     val isLoggedIn: StateFlow<Boolean> = repository.isLoggedInFlow
 
     init {
-        // Auto-sync folders when dashboard opens
-        syncAllFoldersAndSongs()
+        // Auto-sync only folders that were never synced; re-syncing finished folders on every
+        // open (this VM is also created by Home) is left to the manual sync buttons.
+        viewModelScope.launch {
+            if (repository.getFolders().first().any { it.lastSyncTime == 0L }) syncAllFoldersAndSongs()
+        }
     }
 
     fun syncAllFoldersAndSongs() {
