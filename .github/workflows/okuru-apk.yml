@@ -2,7 +2,7 @@ name: Build APK (okuru-id)
 
 on:
   push:
-    tags: [ 'v*' ]
+    tags: [ '*' ]
 
 permissions:
   contents: write
